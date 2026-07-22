@@ -11,12 +11,12 @@ config DFU_OVER_USB
 
 config DFU_OVER_TFTP
 	bool
-	depends on NET
+	depends on NET_LEGACY
 
-if DFU
 config DFU_WRITE_ALT
 	bool
 
+if DFU
 config DFU_TFTP
 	bool "DFU via TFTP"
 	depends on NETDEVICES
@@ -98,6 +98,7 @@ config DFU_SCSI
 
 config SET_DFU_ALT_INFO
 	bool "Dynamic set of DFU alternate information"
+	depends on !COMPILE_TEST
 	help
 	  This option allows to call the function set_dfu_alt_info to
 	  dynamically build dfu_alt_info in board.

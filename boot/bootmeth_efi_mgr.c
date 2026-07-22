@@ -58,8 +58,8 @@ static int efi_mgr_read_bootflow(struct udevice *dev, struct bootflow *bflow)
 	}
 
 	ret = efi_init_obj_list();
-	if (ret)
-		return log_msg_ret("init", ret);
+	if (ret != EFI_SUCCESS)
+		return ret;
 
 	/* Enable this method if the "BootOrder" UEFI exists. */
 	bootorder = efi_get_var(u"BootOrder", &efi_global_variable_guid,
@@ -98,6 +98,15 @@ static int bootmeth_efi_mgr_bind(struct udevice *dev)
 
 	plat->desc = "EFI bootmgr flow";
 	plat->flags = BOOTMETHF_GLOBAL;
+
+	/*
+	 * bootmgr scans all available devices which can take a while,
+	 * especially for network devices. So choose the priority so that it
+	 * comes just before the 'very slow' devices. This allows systems which
+	 * don't rely on bootmgr to boot quickly, while allowing bootmgr to run
+	 * on systems which need it.
+	 */
+	plat->glob_prio = BOOTDEVP_6_NET_BASE;
 
 	return 0;
 }

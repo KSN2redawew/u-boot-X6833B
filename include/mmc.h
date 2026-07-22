@@ -54,6 +54,7 @@ struct bd_info;
 #define MMC_VERSION_4_5		MAKE_MMC_VERSION(4, 5, 0)
 #define MMC_VERSION_5_0		MAKE_MMC_VERSION(5, 0, 0)
 #define MMC_VERSION_5_1		MAKE_MMC_VERSION(5, 1, 0)
+#define MMC_VERSION_5_1B	MAKE_MMC_VERSION(5, 1, 0xB)
 
 #define MMC_CAP(mode)		(1 << mode)
 #define MMC_MODE_HS		(MMC_CAP(MMC_HS) | MMC_CAP(SD_HS))
@@ -759,6 +760,9 @@ struct mmc {
 #endif
 	u8 *ext_csd;
 	u32 cardtype;		/* cardtype read from the MMC */
+#if CONFIG_IS_ENABLED(MMC_UHS_SUPPORT)
+	u32 sd3_bus_mode;	/* Supported UHS-I bus speed modes */
+#endif
 	enum mmc_voltage current_voltage;
 	enum bus_mode selected_mode; /* mode currently used */
 	enum bus_mode best_mode; /* best mode is the supported mode with the

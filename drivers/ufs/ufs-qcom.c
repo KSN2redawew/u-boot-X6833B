@@ -14,8 +14,8 @@
 #include <dm.h>
 #include <dm/device_compat.h>
 #include <generic-phy.h>
-#include <ufs.h>
 #include <asm/gpio.h>
+#include <interconnect.h>
 
 #include <linux/bitops.h>
 #include <linux/delay.h>
@@ -25,6 +25,9 @@
 #include "ufs-qcom.h"
 
 #define ceil(freq, div) ((freq) % (div) == 0 ? ((freq) / (div)) : ((freq) / (div) + 1))
+
+#define UFS_DDR_MAX_BANDWIDTH	7643136
+#define UFS_CPU_MAX_BANDWIDTH	819200
 
 static void ufs_qcom_dev_ref_clk_ctrl(struct ufs_hba *hba, bool enable);
 
@@ -625,7 +628,16 @@ static struct ufs_hba_ops ufs_qcom_hba_ops = {
 static int ufs_qcom_probe(struct udevice *dev)
 {
 	struct ufs_qcom_priv *priv = dev_get_priv(dev);
+	struct icc_path *path;
 	int ret;
+
+	path = of_icc_get(dev, "ufs-ddr");
+	if (!IS_ERR(path))
+		icc_set_bw(path, 0, UFS_DDR_MAX_BANDWIDTH);
+
+	path = of_icc_get(dev, "cpu-ufs");
+	if (!IS_ERR(path))
+		icc_set_bw(path, 0, UFS_CPU_MAX_BANDWIDTH);
 
 	/* get resets */
 	ret = reset_get_by_name(dev, "rst", &priv->core_reset);
@@ -648,13 +660,6 @@ static int ufs_qcom_probe(struct udevice *dev)
 	return 0;
 }
 
-static int ufs_qcom_bind(struct udevice *dev)
-{
-	struct udevice *scsi_dev;
-
-	return ufs_scsi_bind(dev, &scsi_dev);
-}
-
 static const struct udevice_id ufs_qcom_ids[] = {
 	{ .compatible = "qcom,ufshc" },
 	{},
@@ -665,6 +670,5 @@ U_BOOT_DRIVER(qcom_ufshcd) = {
 	.id		= UCLASS_UFS,
 	.of_match	= ufs_qcom_ids,
 	.probe		= ufs_qcom_probe,
-	.bind		= ufs_qcom_bind,
 	.priv_auto	= sizeof(struct ufs_qcom_priv),
 };

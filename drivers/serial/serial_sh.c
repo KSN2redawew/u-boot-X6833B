@@ -59,7 +59,7 @@ static void sh_serial_init_generic(struct uart_port *port)
 	sci_out(port, SCSPTR, 0x0003);
 #endif
 
-#if IS_ENABLED(CONFIG_RCAR_GEN2) || IS_ENABLED(CONFIG_RCAR_GEN3) || IS_ENABLED(CONFIG_RCAR_GEN4)
+#if IS_ENABLED(CONFIG_RCAR_GEN2) || IS_ENABLED(CONFIG_RCAR_GEN3) || IS_ENABLED(CONFIG_RCAR_GEN4) || IS_ENABLED(CONFIG_RCAR_GEN5)
 	if (port->type == PORT_HSCIF)
 		sci_out(port, HSSRR, HSSRR_SRE | HSSRR_SRCYC8);
 #endif
@@ -112,7 +112,16 @@ static int serial_raw_putc(struct uart_port *port, const char c)
 
 static int serial_rx_fifo_level(struct uart_port *port)
 {
-	return scif_rxfill(port);
+	int ret;
+
+	ret = scif_rxfill(port);
+	if (ret)
+		return ret;
+
+	if (sci_in(port, SCxSR) & SCxSR_RDxF(port))
+		return 1;
+
+	return 0;
 }
 
 static int sh_serial_tstc_generic(struct uart_port *port)
@@ -248,7 +257,7 @@ static int sh_serial_of_to_plat(struct udevice *dev)
 	int ret;
 
 	addr = dev_read_addr(dev);
-	if (!addr)
+	if (addr == FDT_ADDR_T_NONE)
 		return -EINVAL;
 
 	plat->base = addr;

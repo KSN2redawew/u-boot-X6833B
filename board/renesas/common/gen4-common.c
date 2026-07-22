@@ -8,19 +8,13 @@
 #include <asm/arch/renesas.h>
 #include <asm/arch/sys_proto.h>
 #include <asm/armv8/mmu.h>
-#include <asm/global_data.h>
 #include <asm/io.h>
 #include <asm/mach-types.h>
 #include <asm/processor.h>
 #include <asm/system.h>
+#include <asm-generic/u-boot.h>
 #include <image.h>
 #include <linux/errno.h>
-
-#define RST_BASE	0xE6160000 /* Domain0 */
-#define RST_WDTRSTCR	(RST_BASE + 0x10)
-#define RST_RWDT	0xA55A8002
-
-DECLARE_GLOBAL_DATA_PTR;
 
 static void init_generic_timer(void)
 {
@@ -47,10 +41,12 @@ static void init_gic_v3(void)
 	writel(0xffffffff, GICR_SGI_BASE + GICR_IGROUPR0);
 }
 
-void s_init(void)
+int mach_cpu_init(void)
 {
 	if (current_el() == 3)
 		init_generic_timer();
+
+	return 0;
 }
 
 int board_early_init_f(void)
@@ -76,10 +72,6 @@ int board_init(void)
 
 	return 0;
 }
-
-#define RST_BASE	0xE6160000 /* Domain0 */
-#define RST_SRESCR0	(RST_BASE + 0x18)
-#define RST_SPRES	0x5AA58000
 
 void __weak reset_cpu(void)
 {

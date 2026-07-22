@@ -19,15 +19,11 @@
 #include <linux/compat.h>
 #include <dt-bindings/pinctrl/pinctrl-zynqmp.h>
 
-#define PINCTRL_GET_FUNC_GROUPS_RESP_LEN	12
-#define PINCTRL_GET_PIN_GROUPS_RESP_LEN		12
-#define NUM_GROUPS_PER_RESP			6
-#define NA_GROUP				-1
-#define RESERVED_GROUP				-2
+#define PINCTRL_GET_FUNC_GROUPS_RESP_LEN	(sizeof(s16) * NUM_GROUPS_PER_RESP)
+#define PINCTRL_GET_PIN_GROUPS_RESP_LEN		(sizeof(s16) * NUM_GROUPS_PER_RESP)
 #define MAX_GROUP_PIN				50
 #define MAX_PIN_GROUPS				50
 #define MAX_GROUP_NAME_LEN			32
-#define MAX_FUNC_NAME_LEN			16
 
 #define DRIVE_STRENGTH_2MA	2
 #define DRIVE_STRENGTH_4MA	4
@@ -127,7 +123,8 @@ static int zynqmp_pm_query_data(enum pm_query_id qid, u32 arg1, u32 arg2, u32 *o
 	int ret;
 	u32 ret_payload[PAYLOAD_ARG_CNT];
 
-	ret = xilinx_pm_request(PM_QUERY_DATA, qid, arg1, arg2, 0, ret_payload);
+	ret = xilinx_pm_request(PM_QUERY_DATA, qid, arg1, arg2, 0, 0,
+				0, ret_payload);
 	if (ret)
 		return ret;
 
@@ -142,7 +139,8 @@ static int zynqmp_pm_pinctrl_get_config(const u32 pin, const u32 param, u32 *val
 	u32 ret_payload[PAYLOAD_ARG_CNT];
 
 	/* Get config for the pin */
-	ret = xilinx_pm_request(PM_PINCTRL_CONFIG_PARAM_GET, pin, param, 0, 0, ret_payload);
+	ret = xilinx_pm_request(PM_PINCTRL_CONFIG_PARAM_GET, pin, param, 0, 0, 0,
+				0, ret_payload);
 	if (ret) {
 		printf("%s failed\n", __func__);
 		return ret;
@@ -164,14 +162,15 @@ static int zynqmp_pm_pinctrl_set_config(const u32 pin, const u32 param, u32 valu
 	}
 
 	/* Request the pin first */
-	ret = xilinx_pm_request(PM_PINCTRL_REQUEST, pin, 0, 0, 0, NULL);
+	ret = xilinx_pm_request(PM_PINCTRL_REQUEST, pin, 0, 0, 0, 0, 0, NULL);
 	if (ret) {
 		printf("%s: pin request failed\n", __func__);
 		return ret;
 	}
 
 	/* Set config for the pin */
-	ret = xilinx_pm_request(PM_PINCTRL_CONFIG_PARAM_SET, pin, param, value, 0, NULL);
+	ret = xilinx_pm_request(PM_PINCTRL_CONFIG_PARAM_SET, pin, param, value,
+				0, 0, 0, NULL);
 	if (ret) {
 		printf("%s failed\n", __func__);
 		return ret;
@@ -186,7 +185,7 @@ static int zynqmp_pinctrl_get_function_groups(u32 fid, u32 index, u16 *groups)
 	u32 ret_payload[PAYLOAD_ARG_CNT];
 
 	ret = xilinx_pm_request(PM_QUERY_DATA, PM_QID_PINCTRL_GET_FUNCTION_GROUPS,
-				fid, index, 0, ret_payload);
+				fid, index, 0, 0, 0, ret_payload);
 	if (ret) {
 		printf("%s failed\n", __func__);
 		return ret;
@@ -242,7 +241,7 @@ static int zynqmp_pinctrl_get_pin_groups(u32 pin, u32 index, u16 *groups)
 	u32 ret_payload[PAYLOAD_ARG_CNT];
 
 	ret = xilinx_pm_request(PM_QUERY_DATA, PM_QID_PINCTRL_GET_PIN_GROUPS,
-				pin, index, 0, ret_payload);
+				pin, index, 0, 0, 0, ret_payload);
 	if (ret) {
 		printf("%s failed to get pin groups\n", __func__);
 		return ret;
@@ -313,13 +312,13 @@ static int zynqmp_pinctrl_probe(struct udevice *dev)
 	for (i = 0; i < priv->nfuncs; i++) {
 		/* Get function name for the function and fill */
 		xilinx_pm_request(PM_QUERY_DATA, PM_QID_PINCTRL_GET_FUNCTION_NAME,
-				  i, 0, 0, ret_payload);
+				  i, 0, 0, 0, 0, ret_payload);
 
 		memcpy((void *)priv->funcs[i].name, ret_payload, MAX_FUNC_NAME_LEN);
 
 		/* And fill number of groups available for certain function */
 		xilinx_pm_request(PM_QUERY_DATA, PM_QID_PINCTRL_GET_NUM_FUNCTION_GROUPS,
-				  i, 0, 0, ret_payload);
+				  i, 0, 0, 0, 0, ret_payload);
 
 		priv->funcs[i].ngroups = ret_payload[1];
 		priv->ngroups += priv->funcs[i].ngroups;
@@ -370,7 +369,8 @@ static int zynqmp_pinmux_set(struct udevice *dev, unsigned int selector,
 	int ret;
 
 	/* Request the pin first */
-	ret = xilinx_pm_request(PM_PINCTRL_REQUEST, selector, 0, 0, 0, NULL);
+	ret = xilinx_pm_request(PM_PINCTRL_REQUEST, selector, 0, 0, 0, 0,
+				0, NULL);
 	if (ret) {
 		printf("%s: pin request failed\n", __func__);
 		return ret;
@@ -378,7 +378,7 @@ static int zynqmp_pinmux_set(struct udevice *dev, unsigned int selector,
 
 	/* Set the pin function */
 	ret = xilinx_pm_request(PM_PINCTRL_SET_FUNCTION, selector, func_selector,
-				0, 0, NULL);
+				0, 0, 0, 0, NULL);
 	if (ret) {
 		printf("%s: Failed to set pinmux function\n", __func__);
 		return ret;

@@ -52,7 +52,11 @@ static int simple_video_probe(struct udevice *dev)
 	uc_priv->xsize = width;
 	uc_priv->ysize = height;
 
+<<<<<<< HEAD
 	/* Optional property - stride. */
+=======
+	/* Optional - in most cases, auto-calculation works */
+>>>>>>> denx/master
 	ret = ofnode_read_u32(node, "stride", &stride);
 	if (!ret || stride)
 		uc_priv->line_length = stride;

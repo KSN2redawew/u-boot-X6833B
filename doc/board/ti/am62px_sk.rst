@@ -99,7 +99,9 @@ Set the variables corresponding to this platform:
    # we dont use any extra TFA parameters
    unset TFA_EXTRA_ARGS
    export OPTEE_PLATFORM=k3-am62x
-   export OPTEE_EXTRA_ARGS="CFG_WITH_SOFTWARE_PRNG=y"
+   # we dont use any extra OPTEE parameters
+   unset OPTEE_EXTRA_ARGS
+
 
 .. am62px_evm_rst_include_start_build_steps
 
@@ -265,8 +267,8 @@ https://www.ti.com/lit/pdf/spruj83 under the `Boot Mode Pins` section.
    :header-rows: 1
 
    * - Switch Label
-     - SW2: 12345678
-     - SW3: 12345678
+     - SW5: 12345678
+     - SW4: 12345678
 
    * - SD
      - 01000000
@@ -289,6 +291,37 @@ https://www.ti.com/lit/pdf/spruj83 under the `Boot Mode Pins` section.
      - 11001010
 
 For SW2 and SW1, the switch state in the "ON" position = 1.
+
+Falcon Mode
+-----------
+
+Falcon Mode on AM62px platforms bypasses the A53 SPL and U-Boot with the overall
+boot flow as below:
+
+.. include:: am62x_sk.rst
+    :start-after: .. am62x_evm_falcon_start_boot_flow
+    :end-before: .. am62x_evm_falcon_end_boot_flow
+
+Build Process
+^^^^^^^^^^^^^
+
+.. include:: am62x_sk.rst
+    :start-after: .. am62x_evm_falcon_start_build_process
+    :end-before: .. am62x_evm_falcon_end_build_process
+
+Usage
+^^^^^
+
+.. include:: am62x_sk.rst
+    :start-after: .. am62x_evm_falcon_start_usage
+    :end-before: .. am62x_evm_falcon_end_usage
+
+R5 SPL Memory Map
+^^^^^^^^^^^^^^^^^
+
+.. include:: am62x_sk.rst
+    :start-after: .. am62x_evm_falcon_start_r5_memory_map
+    :end-before: .. am62x_evm_falcon_end_r5_memory_map
 
 Debugging U-Boot
 ----------------

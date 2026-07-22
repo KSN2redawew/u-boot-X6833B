@@ -353,7 +353,7 @@ static int load_simple_fit(struct spl_load_info *info, ulong fit_offset,
 		}
 		length = loadEnd - CONFIG_SYS_LOAD_ADDR;
 	} else {
-		memcpy(load_ptr, src, length);
+		memmove(load_ptr, src, length);
 	}
 
 	if (image_info) {
@@ -448,8 +448,8 @@ static int spl_fit_append_fdt(struct spl_image_info *spl_image,
 				debug("%s: No additional FDT node\n", __func__);
 				ret = 0;
 				break;
-			} else if (ret < 0) {
-				continue;
+			} else if (ret) {
+				break;
 			}
 
 			ret = board_spl_fit_append_fdt_skip(str);
@@ -550,6 +550,23 @@ static int spl_fit_image_is_fpga(const void *fit, int node)
 	return !strcmp(type, "fpga");
 }
 
+static void spl_fit_image_record_arm32_optee(const void *fit, int node,
+					     struct spl_image_info *spl_image,
+					     struct spl_image_info *image_info)
+{
+#if defined(CONFIG_BOOTM_OPTEE) && defined(CONFIG_ARM) && !defined(CONFIG_ARM64)
+	const char *type = fdt_getprop(fit, node, FIT_TYPE_PROP, NULL);
+
+	if (!type)
+		return;
+
+	if (strcmp(type, "tee"))
+		return;
+
+	spl_image->optee_addr = image_info->load_addr;
+#endif
+}
+
 static int spl_fit_image_get_os(const void *fit, int noffset, uint8_t *os)
 {
 	if (!CONFIG_IS_ENABLED(FIT_IMAGE_TINY) || CONFIG_IS_ENABLED(OS_BOOT))
@@ -576,9 +593,10 @@ static int spl_fit_image_get_os(const void *fit, int noffset, uint8_t *os)
  * The purpose of the FIT load buffer is to provide a memory location that is
  * independent of the load address of any FIT component.
  */
-static void *spl_get_fit_load_buffer(size_t size)
+__weak void *board_spl_fit_buffer_addr(ulong fit_size, int sectors, int bl_len)
 {
 	void *buf;
+	size_t size = sectors * bl_len;
 
 	buf = malloc_cache_aligned(size);
 	if (!buf) {
@@ -592,11 +610,6 @@ static void *spl_get_fit_load_buffer(size_t size)
 		buf = spl_get_load_buffer(0, size);
 	}
 	return buf;
-}
-
-__weak void *board_spl_fit_buffer_addr(ulong fit_size, int sectors, int bl_len)
-{
-	return spl_get_fit_load_buffer(sectors * bl_len);
 }
 
 /*
@@ -902,6 +915,9 @@ int spl_load_simple_fit(struct spl_image_info *spl_image,
 		if (spl_image->entry_point == FDT_ERROR &&
 		    image_info.entry_point != FDT_ERROR)
 			spl_image->entry_point = image_info.entry_point;
+
+		spl_fit_image_record_arm32_optee(ctx.fit, node, spl_image,
+						 &image_info);
 
 		/* Record our loadables into the FDT */
 		if (!CONFIG_IS_ENABLED(FIT_IMAGE_TINY) &&

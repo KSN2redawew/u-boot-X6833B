@@ -197,7 +197,7 @@ config PINCTRL_AR933X
 
 config PINCTRL_AT91
 	bool "AT91 pinctrl driver"
-	depends on DM
+	depends on DM && ARCH_AT91
 	help
 	  This option is to enable the AT91 pinctrl driver for AT91 PIO
 	  controller.
@@ -213,13 +213,14 @@ config PINCTRL_AT91
 
 config PINCTRL_AT91PIO4
 	bool "AT91 PIO4 pinctrl driver"
-	depends on DM
+	depends on DM && ARCH_AT91
 	help
 	  This option is to enable the AT91 pinctrl driver for AT91 PIO4
 	  controller which is available on SAMA5D2 SoC.
 
 config PINCTRL_INTEL
 	bool "Standard Intel pin-control and pin-mux driver"
+	depends on X86
 	help
 	  Recent Intel chips such as Apollo Lake (APL) use a common pin control
 	  and GPIO scheme. The settings for this come from an SoC-specific
@@ -248,7 +249,7 @@ config PINCTRL_QCA953X
 
 config PINCTRL_QE
 	bool "QE based pinctrl driver, like on mpc83xx"
-	depends on DM
+	depends on DM && MPC83xx
 	help
 	  This option is to enable the QE pinctrl driver for QE based io
 	  controller.
@@ -290,9 +291,19 @@ config PINCTRL_SANDBOX
 	  Currently, this driver actually does nothing but print debug
 	  messages when pinctrl operations are invoked.
 
+config PINCTRL_SCMI
+	bool "Support SCMI pin controllers"
+	depends on PINCTRL_FULL && SCMI_FIRMWARE
+	help
+	  This is for pinctrl over the SCMI protocol.  This allows the
+	  initial pin configuration to be set up from the device tree.  The
+	  gpio_scmi driver is built on top of this driver if GPIO is
+	  required.
+
 config PINCTRL_SINGLE
 	bool "Single register pin-control and pin-multiplex driver"
 	depends on DM
+	select DEVRES
 	help
 	  This enables pinctrl driver for systems using a single register for
 	  pin configuration and multiplexing. TI's AM335X SoCs are examples of
@@ -343,7 +354,7 @@ config SPL_PINCTRL_STMFX
 
 config PINCTRL_TH1520
 	bool "T-Head TH1520 pinctrl driver"
-	depends on DM && PINCTRL_FULL
+	depends on DM && PINCTRL_GENERIC
 	select PINCONF
 	help
 	  Support pin multiplexing and configuration control blocks on the
@@ -383,6 +394,14 @@ config PINCTRL_ZYNQMP
 	  Support pin multiplexing control on Xilinx ZynqMP. The driver uses
 	  Generic Pinctrl framework and is compatible with the Linux driver,
 	  i.e. it uses the same device tree configuration.
+
+config SPL_PINCTRL_ZYNQMP
+	bool "Xilinx ZynqMP pin control driver in SPL"
+	depends on SPL_DM && SPL_PINCTRL_GENERIC && ARCH_ZYNQMP
+	default PINCTRL_ZYNQMP
+	help
+	  Support pin multiplexing control in SPL on Xilinx ZynqMP. Only "pins"
+	  can be muxed; "groups" are not supported.
 
 endif
 

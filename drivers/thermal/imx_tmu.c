@@ -5,7 +5,6 @@
  */
 
 #include <config.h>
-#include <asm/global_data.h>
 #include <asm/io.h>
 #include <asm/arch/clock.h>
 #include <asm/arch/sys_proto.h>
@@ -18,8 +17,6 @@
 #include <linux/delay.h>
 #include <malloc.h>
 #include <thermal.h>
-
-DECLARE_GLOBAL_DATA_PTR;
 
 #define SITES_MAX	16
 #define FLAGS_VER2	0x1
@@ -245,7 +242,7 @@ int imx_tmu_get_temp(struct udevice *dev, int *temp)
 			return ret;
 	}
 
-	*temp = cpu_tmp / 1000;
+	*temp = cpu_tmp;
 
 	return 0;
 }
@@ -532,6 +529,16 @@ static int imx_tmu_enable_msite(struct udevice *dev)
 	return 0;
 }
 
+static void imx_tmu_set_trips(struct imx_tmu_plat *pdata)
+{
+	int minc, maxc;
+
+	/* default alert/crit temps based on temp grade */
+	get_cpu_temp_grade(&minc, &maxc);
+	pdata->critical = maxc * 1000;
+	pdata->alert = (maxc - 10) * 1000;
+}
+
 static int imx_tmu_bind(struct udevice *dev)
 {
 	struct imx_tmu_plat *pdata = dev_get_plat(dev);
@@ -539,7 +546,6 @@ static int imx_tmu_bind(struct udevice *dev)
 	ofnode node, offset;
 	const char *name;
 	const void *prop;
-	int minc, maxc;
 
 	dev_dbg(dev, "%s\n", __func__);
 
@@ -548,10 +554,7 @@ static int imx_tmu_bind(struct udevice *dev)
 		return 0;
 
 	pdata->zone_node = 1;
-	/* default alert/crit temps based on temp grade */
-	get_cpu_temp_grade(&minc, &maxc);
-	pdata->critical = maxc * 1000;
-	pdata->alert = (maxc - 10) * 1000;
+	imx_tmu_set_trips(pdata);
 
 	node = ofnode_path("/thermal-zones");
 	ofnode_for_each_subnode(offset, node) {
@@ -572,7 +575,7 @@ static int imx_tmu_parse_fdt(struct udevice *dev)
 {
 	struct imx_tmu_plat *pdata = dev_get_plat(dev), *p_parent_data;
 	struct ofnode_phandle_args args;
-	ofnode trips_np, cpu_thermal_np;
+	ofnode cpu_thermal_np;
 	int ret;
 
 	dev_dbg(dev, "%s\n", __func__);
@@ -612,20 +615,7 @@ static int imx_tmu_parse_fdt(struct udevice *dev)
 	pdata->polling_delay = dev_read_u32_default(dev, "polling-delay",
 						    IMX_TMU_POLLING_DELAY_MS);
 
-	trips_np = ofnode_path("/thermal-zones/cpu-thermal/trips");
-	ofnode_for_each_subnode(trips_np, trips_np) {
-		const char *type;
-
-		type = ofnode_get_property(trips_np, "type", NULL);
-		if (!type)
-			continue;
-		if (!strcmp(type, "critical"))
-			pdata->critical = ofnode_read_u32_default(trips_np, "temperature", 85);
-		else if (strcmp(type, "passive") == 0)
-			pdata->alert = ofnode_read_u32_default(trips_np, "temperature", 80);
-		else
-			continue;
-	}
+	imx_tmu_set_trips(pdata);
 
 	dev_dbg(dev, "id %d polling_delay %d, critical %d, alert %d\n",
 		pdata->id, pdata->polling_delay, pdata->critical, pdata->alert);

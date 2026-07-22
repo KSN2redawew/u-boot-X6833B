@@ -86,6 +86,7 @@ static const struct {
 	{"swap",	NULL,	PARTITION_LINUX_SWAP_GUID},
 	{"lvm",		NULL,	PARTITION_LINUX_LVM_GUID},
 	{"u-boot-env",	NULL,	PARTITION_U_BOOT_ENVIRONMENT},
+	{"xbootldr",	NULL,	PARTITION_XBOOTLDR},
 	{"cros-kern",	NULL,	PARTITION_CROS_KERNEL},
 	{"cros-root",	NULL,	PARTITION_CROS_ROOT},
 	{"cros-fw",	NULL,	PARTITION_CROS_FIRMWARE},
@@ -138,6 +139,10 @@ static const struct {
 	{
 		NULL, "Disk IO",
 		EFI_DISK_IO_PROTOCOL_GUID,
+	},
+	{
+		NULL, "Partition Info",
+		EFI_PARTITION_INFO_PROTOCOL_GUID,
 	},
 	{
 		NULL, "Simple File System",
@@ -250,12 +255,22 @@ static const struct {
 		NULL, "EFI Conformance Profiles Table",
 		EFI_CONFORMANCE_PROFILES_TABLE_GUID,
 	},
+#if CONFIG_IS_ENABLED(EFI_ECPT)
+	{
+		NULL, "EFI EBBR 2.1 Conformance Profile",
+		EFI_CONFORMANCE_PROFILE_EBBR_2_1_GUID,
+	},
+#endif
 #ifdef CONFIG_EFI_RISCV_BOOT_PROTOCOL
 	{
 		NULL, "RISC-V Boot",
 		RISCV_EFI_BOOT_PROTOCOL_GUID,
 	},
 #endif
+	{
+		NULL, "EFI Debug Image Info Table",
+		EFI_DEBUG_IMAGE_INFO_TABLE_GUID,
+	},
 #endif /* CONFIG_CMD_EFIDEBUG */
 #ifdef CONFIG_CMD_NVEDIT_EFI
 	/* signature database */

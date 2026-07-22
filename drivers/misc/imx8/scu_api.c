@@ -374,6 +374,31 @@ void sc_misc_boot_status(sc_ipc_t ipc, sc_misc_boot_status_t status)
 		       __func__, status, RPC_R8(&msg));
 }
 
+int sc_misc_get_boot_type(sc_ipc_t ipc, sc_misc_bt_t *type)
+{
+	struct udevice *dev = gd->arch.scu_dev;
+	int size = sizeof(struct sc_rpc_msg_s);
+	struct sc_rpc_msg_s msg;
+	int ret;
+
+	if (!dev)
+		hang();
+
+	RPC_VER(&msg) = SC_RPC_VERSION;
+	RPC_SIZE(&msg) = 1U;
+	RPC_SVC(&msg) = (u8)SC_RPC_SVC_MISC;
+	RPC_FUNC(&msg) = (u8)MISC_FUNC_GET_BOOT_TYPE;
+
+	ret = misc_call(dev, SC_FALSE, &msg, size, &msg, size);
+	if (ret < 0)
+		return ret;
+
+	if (type)
+		*type = (u8)RPC_U8(&msg, 0U);
+
+	return 0;
+}
+
 int sc_misc_get_boot_container(sc_ipc_t ipc, u8 *idx)
 {
 	struct udevice *dev = gd->arch.scu_dev;
@@ -1283,6 +1308,37 @@ int sc_seco_secvio_dgo_config(sc_ipc_t ipc, u8 id, u8 access, u32 *data)
 		       __func__, id, access, RPC_R8(&msg));
 
 	*data = RPC_U32(&msg, 0U);
+
+	return ret;
+}
+
+int sc_seco_commit(sc_ipc_t ipc, u32 *info)
+{
+	struct udevice *dev = gd->arch.scu_dev;
+	struct sc_rpc_msg_s msg;
+	int size = sizeof(struct sc_rpc_msg_s);
+	int ret;
+
+	/* Fill in header */
+	RPC_VER(&msg) = SC_RPC_VERSION;
+	RPC_SIZE(&msg) = 2U;
+	RPC_SVC(&msg) = (u8)SC_RPC_SVC_SECO;
+	RPC_FUNC(&msg) = (u8)SECO_FUNC_COMMIT;
+
+	/* Fill in send message */
+	RPC_U32(&msg, 0U) = *info;
+
+	/* Call RPC */
+	ret = misc_call(dev, SC_FALSE, &msg, size, &msg, size);
+	if (ret)
+		return ret;
+
+	/* Copy out result */
+	ret = (int)RPC_R8(&msg);
+
+	/* Copy out receive message */
+	if (!ret)
+		*info = RPC_U32(&msg, 0U);
 
 	return ret;
 }

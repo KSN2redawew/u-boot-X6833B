@@ -26,7 +26,8 @@ static struct legacy_img_hdr header;
 
 static int fit_estimate_hash_sig_size(struct image_tool_params *params, const char *fname)
 {
-	bool signing = IMAGE_ENABLE_SIGN && (params->keydir || params->keyfile);
+	bool signing = IMAGE_ENABLE_SIGN &&
+		(params->keydir || params->keyfile || params->engine_id);
 	struct stat sbuf;
 	void *fdt;
 	int fd;
@@ -168,6 +169,20 @@ static int fit_calc_size(struct image_tool_params *params)
 
 	if (params->fit_ramdisk) {
 		size = imagetool_get_filesize(params, params->fit_ramdisk);
+		if (size < 0)
+			return -1;
+		total_size += size;
+	}
+
+	if (params->fit_tfa_bl31) {
+		size = imagetool_get_filesize(params, params->fit_tfa_bl31);
+		if (size < 0)
+			return -1;
+		total_size += size;
+	}
+
+	if (params->fit_tee) {
+		size = imagetool_get_filesize(params, params->fit_tee);
 		if (size < 0)
 			return -1;
 		total_size += size;
@@ -402,6 +417,54 @@ static int fit_write_images(struct image_tool_params *params, char *fdt)
 		fdt_end_node(fdt);
 	}
 
+	/* And a TFA BL31 file if available */
+	if (params->fit_tfa_bl31) {
+		fdt_begin_node(fdt, FIT_TFA_BL31_PROP "-1");
+
+		fdt_property_string(fdt, FIT_TYPE_PROP, FIT_TFA_BL31_PROP);
+		fdt_property_string(fdt, FIT_OS_PROP,
+				    genimg_get_os_short_name(params->os));
+		fdt_property_string(fdt, FIT_ARCH_PROP,
+				    genimg_get_arch_short_name(params->arch));
+		get_basename(str, sizeof(str), params->fit_tfa_bl31);
+		fdt_property_string(fdt, FIT_DESC_PROP, str);
+
+		ret = fdt_property_file(params, fdt, FIT_DATA_PROP,
+					params->fit_tfa_bl31);
+		if (ret)
+			return ret;
+		fdt_property_u32(fdt, FIT_LOAD_PROP, params->fit_tfa_bl31_addr);
+		fdt_property_u32(fdt, FIT_ENTRY_PROP, params->fit_tfa_bl31_addr);
+		fit_add_hash_or_sign(params, fdt, true);
+		if (ret)
+			return ret;
+		fdt_end_node(fdt);
+	}
+
+	/* And a TEE file if available */
+	if (params->fit_tee) {
+		fdt_begin_node(fdt, FIT_TEE_PROP "-1");
+
+		fdt_property_string(fdt, FIT_TYPE_PROP, FIT_TEE_PROP);
+		fdt_property_string(fdt, FIT_OS_PROP,
+				    genimg_get_os_short_name(params->os));
+		fdt_property_string(fdt, FIT_ARCH_PROP,
+				    genimg_get_arch_short_name(params->arch));
+		get_basename(str, sizeof(str), params->fit_tee);
+		fdt_property_string(fdt, FIT_DESC_PROP, str);
+
+		ret = fdt_property_file(params, fdt, FIT_DATA_PROP,
+					params->fit_tee);
+		if (ret)
+			return ret;
+		fdt_property_u32(fdt, FIT_LOAD_PROP, params->fit_tee_addr);
+		fdt_property_u32(fdt, FIT_ENTRY_PROP, params->fit_tee_addr);
+		fit_add_hash_or_sign(params, fdt, true);
+		if (ret)
+			return ret;
+		fdt_end_node(fdt);
+	}
+
 	fdt_end_node(fdt);
 
 	return 0;
@@ -421,7 +484,7 @@ static void fit_write_configs(struct image_tool_params *params, char *fdt)
 	struct content_info *cont;
 	const char *typename;
 	char str[100];
-	int upto;
+	int upto, len;
 
 	fdt_begin_node(fdt, "configurations");
 	fdt_property_string(fdt, FIT_DEFAULT_PROP, "conf-1");
@@ -439,8 +502,20 @@ static void fit_write_configs(struct image_tool_params *params, char *fdt)
 
 		typename = genimg_get_type_short_name(params->fit_image_type);
 		snprintf(str, sizeof(str), "%s-1", typename);
+		len = strlen(str);
 		fdt_property_string(fdt, typename, str);
-		fdt_property_string(fdt, FIT_LOADABLE_PROP, str);
+
+		if (params->fit_tfa_bl31) {
+			snprintf(&str[len + 1], sizeof(str) - (len + 1), FIT_TFA_BL31_PROP "-1");
+			len += strlen(&str[len + 1]) + 1;
+		}
+
+		if (params->fit_tee) {
+			snprintf(&str[len + 1], sizeof(str) - (len + 1), FIT_TEE_PROP "-1");
+			len += strlen(&str[len + 1]) + 1;
+		}
+
+		fdt_property(fdt, FIT_LOADABLE_PROP, str, len + 1);
 
 		if (params->fit_ramdisk)
 			fdt_property_string(fdt, FIT_RAMDISK_PROP,
@@ -456,7 +531,20 @@ static void fit_write_configs(struct image_tool_params *params, char *fdt)
 		fdt_begin_node(fdt, "conf-1");
 		typename = genimg_get_type_short_name(params->fit_image_type);
 		snprintf(str, sizeof(str), "%s-1", typename);
+		len = strlen(str);
 		fdt_property_string(fdt, typename, str);
+
+		if (params->fit_tfa_bl31) {
+			snprintf(&str[len + 1], sizeof(str) - (len + 1), FIT_TFA_BL31_PROP "-1");
+			len += strlen(&str[len + 1]) + 1;
+		}
+
+		if (params->fit_tee) {
+			snprintf(&str[len + 1], sizeof(str) - (len + 1), FIT_TEE_PROP "-1");
+			len += strlen(&str[len + 1]) + 1;
+		}
+
+		fdt_property(fdt, FIT_LOADABLE_PROP, str, len + 1);
 
 		if (params->fit_ramdisk)
 			fdt_property_string(fdt, FIT_RAMDISK_PROP,
@@ -563,10 +651,9 @@ static int fit_extract_data(struct image_tool_params *params, const char *fname)
 	int ret;
 	int images;
 	int node;
-	int image_number;
-	int align_size;
+	int align_size = 0;
+	int len = 0;
 
-	align_size = params->bl_len ? params->bl_len : 4;
 	fd = mmap_fdt(params->cmdname, fname, 0, &fdt, &sbuf, false, false);
 	if (fd < 0)
 		return -EIO;
@@ -578,24 +665,58 @@ static int fit_extract_data(struct image_tool_params *params, const char *fname)
 		ret = -EINVAL;
 		goto err_munmap;
 	}
-	image_number = fdtdec_get_child_count(fdt, images);
+
+	/* Add up all the alignments, we no longer need to count images. */
+	fdt_for_each_subnode(node, fdt, images) {
+		const char *type;
+		int len;
+
+		if (params->bl_len) {
+			align_size += params->bl_len;
+			continue;
+		}
+
+		type = fdt_getprop(fdt, node, FIT_TYPE_PROP, &len);
+		if (type && len == sizeof("flat_dt") && !memcmp(type, "flat_dt", len)) {
+			align_size += 8;
+			continue;
+		}
+
+		/* Default alignment to 4 Bytes */
+		align_size += 4;
+	}
 
 	/*
 	 * Allocate space to hold the image data we will extract,
 	 * extral space allocate for image alignment to prevent overflow.
 	 */
-	buf = calloc(1, fit_size + (align_size * image_number));
+	buf = calloc(1, fit_size + align_size);
 	if (!buf) {
 		ret = -ENOMEM;
 		goto err_munmap;
 	}
 	buf_ptr = 0;
 
-	for (node = fdt_first_subnode(fdt, images);
-	     node >= 0;
-	     node = fdt_next_subnode(fdt, node)) {
-		const char *data;
-		int len;
+	fdt_for_each_subnode(node, fdt, images) {
+		const char *data, *type;
+		int pl;
+
+		if (params->bl_len) {
+			align_size = params->bl_len;
+		} else {
+			type = fdt_getprop(fdt, node, FIT_TYPE_PROP, &pl);
+			if (type && pl == sizeof("flat_dt") && !memcmp(type, "flat_dt", pl))
+				align_size = 8;
+			else	/* Default alignment to 4 Bytes */
+				align_size = 4;
+		}
+
+		/*
+		 * The 'len' is 0 in the first round, so 'buf_ptr' is
+		 * not incremented. Otherwise, 'len' is passed over
+		 * from the previous round.
+		 */
+		buf_ptr += ALIGN(len, align_size);
 
 		data = fdt_getprop(fdt, node, FIT_DATA_PROP, &len);
 		if (!data)
@@ -610,15 +731,28 @@ static int fit_extract_data(struct image_tool_params *params, const char *fname)
 		}
 		if (params->external_offset > 0) {
 			/* An external offset positions the data absolutely. */
-			fdt_setprop_u32(fdt, node, FIT_DATA_POSITION_PROP,
-					params->external_offset + buf_ptr);
+			ret = fdt_setprop_u32(fdt, node, FIT_DATA_POSITION_PROP,
+					      params->external_offset + buf_ptr);
 		} else {
-			fdt_setprop_u32(fdt, node, FIT_DATA_OFFSET_PROP,
-					buf_ptr);
+			ret = fdt_setprop_u32(fdt, node, FIT_DATA_OFFSET_PROP,
+					      buf_ptr);
 		}
-		fdt_setprop_u32(fdt, node, FIT_DATA_SIZE_PROP, len);
-		buf_ptr += ALIGN(len, align_size);
+
+		if (ret) {
+			ret = -EINVAL;
+			goto err_munmap;
+		}
+
+		ret = fdt_setprop_u32(fdt, node, FIT_DATA_SIZE_PROP, len);
+
+		if (ret) {
+			ret = -EINVAL;
+			goto err_munmap;
+		}
 	}
+
+	/* Increment 'buf_ptr' for the trailing image. */
+	buf_ptr += ALIGN(len, align_size);
 
 	/* Pack the FDT and place the data after it */
 	fdt_pack(fdt);
@@ -745,11 +879,25 @@ static int fit_import_data(struct image_tool_params *params, const char *fname)
 		debug("Importing data size %x\n", len);
 
 		ret = fdt_setprop(fdt, node, FIT_DATA_PROP, data, len);
-		ret = fdt_delprop(fdt, node, ext_data_prop);
-
 		if (ret) {
 			debug("%s: Failed to write property: %s\n", __func__,
 			      fdt_strerror(ret));
+			ret = -EINVAL;
+			goto err_munmap;
+		}
+
+		ret = fdt_delprop(fdt, node, ext_data_prop);
+		if (ret) {
+			debug("%s: Failed to erase property: %s\n", __func__,
+			      fdt_strerror(ret));
+			ret = -EINVAL;
+			goto err_munmap;
+		}
+
+		ret = fdt_delprop(fdt, node, FIT_DATA_SIZE_PROP);
+		if (ret) {
+			debug("%s: Failed to erase %s property: %s\n", __func__,
+			      FIT_DATA_SIZE_PROP, fdt_strerror(ret));
 			ret = -EINVAL;
 			goto err_munmap;
 		}

@@ -230,6 +230,7 @@ int print_cpuinfo(void)
 	ret = uclass_get_device(UCLASS_THERMAL, 0, &thermal_dev);
 	if (!ret) {
 		ret = thermal_get_temp(thermal_dev, &cpu_tmp);
+		cpu_tmp /= 1000;
 
 		if (!ret)
 			printf(" at %dC", cpu_tmp);
@@ -284,10 +285,10 @@ u32 get_ahb_clk(void)
 
 void arch_preboot_os(void)
 {
-#if defined(CONFIG_IMX_AHCI)
 	struct udevice *dev;
 	int rc;
 
+#if defined(CONFIG_IMX_AHCI)
 	rc = uclass_find_device(UCLASS_AHCI, 0, &dev);
 	if (!rc && dev) {
 		rc = device_remove(dev, DM_REMOVE_NORMAL);
@@ -307,11 +308,18 @@ void arch_preboot_os(void)
 #endif
 #if defined(CONFIG_VIDEO_IPUV3)
 	/* disable video before launching O/S */
-	ipuv3_fb_shutdown();
+	rc = uclass_find_first_device(UCLASS_VIDEO, &dev);
+	while (!rc && dev) {
+		if (device_active(dev))
+			ipuv3_fb_shutdown(dev);
+		uclass_find_next_device(&dev);
+	}
 #endif
 #if defined(CONFIG_VIDEO_MXS) && !defined(CONFIG_VIDEO)
 	lcdif_power_down();
 #endif
+    (void)dev;
+    (void)rc;
 }
 
 #ifndef CONFIG_IMX8M

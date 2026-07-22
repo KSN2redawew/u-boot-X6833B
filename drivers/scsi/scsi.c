@@ -82,23 +82,6 @@ static void scsi_setup_inquiry(struct scsi_cmd *pccb)
 	pccb->msgout[0] = SCSI_IDENTIFY; /* NOT USED */
 }
 
-static void scsi_setup_sync_cache(struct scsi_cmd *pccb, lbaint_t start,
-				  lbaint_t blocks)
-{
-	pccb->cmd[0] = SCSI_SYNC_CACHE;
-	pccb->cmd[1] = 0;
-	pccb->cmd[2] = (unsigned char)(start >> 24) & 0xff;
-	pccb->cmd[3] = (unsigned char)(start >> 16) & 0xff;
-	pccb->cmd[4] = (unsigned char)(start >> 8) & 0xff;
-	pccb->cmd[5] = (unsigned char)start & 0xff;
-	pccb->cmd[6] = 0;
-	pccb->cmd[7] = (unsigned char)(blocks >> 8) & 0xff;
-	pccb->cmd[8] = (unsigned char)blocks & 0xff;
-	pccb->cmd[9] = 0;
-	pccb->cmdlen = 10;
-	pccb->msgout[0] = SCSI_IDENTIFY; /* NOT USED */
-}
-
 static void scsi_setup_read_ext(struct scsi_cmd *pccb, lbaint_t start,
 				lbaint_t blocks)
 {
@@ -124,7 +107,7 @@ static void scsi_setup_write_ext(struct scsi_cmd *pccb, lbaint_t start,
 				 lbaint_t blocks)
 {
 	pccb->cmd[0] = SCSI_WRITE10;
-	pccb->cmd[1] = 0;
+	pccb->cmd[1] = 0x08; /* Set FUA bit to bypass write cache */
 	pccb->cmd[2] = (unsigned char)(start >> 24) & 0xff;
 	pccb->cmd[3] = (unsigned char)(start >> 16) & 0xff;
 	pccb->cmd[4] = (unsigned char)(start >> 8) & 0xff;
@@ -220,7 +203,6 @@ static ulong scsi_read(struct udevice *dev, lbaint_t blknr, lbaint_t blkcnt,
 			pccb->datalen = block_dev->blksz * blocks;
 			scsi_setup_read16(pccb, start, blocks);
 			start += blocks;
-			blks -= blocks;
 		} else
 #endif
 		if (blks > max_blks) {
@@ -301,11 +283,6 @@ static ulong scsi_write(struct udevice *dev, lbaint_t blknr, lbaint_t blkcnt,
 		blks -= blocks;
 		buf_addr += pccb->datalen;
 	} while (blks != 0);
-
-	/* Flush the SCSI cache so we don't lose data on board reset. */
-	scsi_setup_sync_cache(pccb, 0, 0);
-	if (scsi_exec(bdev, pccb))
-		scsi_print_error(pccb);
 
 	debug("%s: end startblk " LBAF ", blccnt " LBAF " buffer %lX\n",
 	      __func__, start, blocks, buf_addr);
@@ -514,7 +491,7 @@ static int scsi_detect_dev(struct udevice *dev, int target, int lun,
 	pccb->target = target;
 	pccb->lun = lun;
 	pccb->pdata = tempbuff;
-	pccb->datalen = 512;
+	pccb->datalen = 36;
 	pccb->dma_dir = DMA_FROM_DEVICE;
 	scsi_setup_inquiry(pccb);
 	if (scsi_exec(dev, pccb)) {
@@ -584,7 +561,7 @@ static int do_scsi_scan_one(struct udevice *dev, int id, int lun, bool verbose)
 	struct udevice *bdev;
 	struct blk_desc bd;
 	struct blk_desc *bdesc;
-	char str[10], *name;
+	char str[10];
 
 	/*
 	 * detect the scsi driver to get information about its geometry (block
@@ -600,10 +577,7 @@ static int do_scsi_scan_one(struct udevice *dev, int id, int lun, bool verbose)
 	* block devices created
 	*/
 	snprintf(str, sizeof(str), "id%dlun%d", id, lun);
-	name = strdup(str);
-	if (!name)
-		return log_msg_ret("nam", -ENOMEM);
-	ret = blk_create_devicef(dev, "scsi_blk", name, UCLASS_SCSI, -1,
+	ret = blk_create_devicef(dev, "scsi_blk", str, UCLASS_SCSI, -1,
 				 bd.blksz, bd.lba, &bdev);
 	if (ret) {
 		debug("Can't create device\n");

@@ -234,6 +234,7 @@ enum image_type_t {
 	IH_TYPE_STARFIVE_SPL,		/* StarFive SPL image */
 	IH_TYPE_TFA_BL31,		/* TFA BL31 image */
 	IH_TYPE_STM32IMAGE_V2,		/* STMicroelectronics STM32 Image V2.0 */
+	IH_TYPE_AMLIMAGE,		/* Amlogic Boot Image */
 
 	IH_TYPE_COUNT,			/* Number of image types */
 };
@@ -654,10 +655,10 @@ int boot_get_fpga(struct bootm_headers *images);
  * boot_get_ramdisk() is responsible for finding a valid ramdisk image.
  * Currently supported are the following ramdisk sources:
  *      - multicomponent kernel/ramdisk image,
- *      - commandline provided address of decicated ramdisk image.
+ *      - commandline provided address of dedicated ramdisk image.
  *
  * returns:
- *     0, if ramdisk image was found and valid, or skiped
+ *     0, if ramdisk image was found and valid, or skipped
  *     rd_start and rd_end are set to ramdisk start/end addresses if
  *     ramdisk image is found and valid
  *
@@ -739,7 +740,7 @@ int boot_get_fdt_fit(struct bootm_headers *images, ulong addr,
  * @param bootstage_id	ID of starting bootstage to use for progress updates.
  *			This will be added to the BOOTSTAGE_SUB values when
  *			calling bootstage_mark()
- * @param load_op	Decribes what to do with the load address
+ * @param load_op	Describes what to do with the load address
  * @param datap		Returns address of loaded image
  * @param lenp		Returns length of loaded image
  * Return: node offset of image, or -ve error code on error:
@@ -812,7 +813,7 @@ int fit_get_node_from_config(struct bootm_headers *images,
  * boot_get_fdt() is responsible for finding a valid flat device tree image.
  * Currently supported are the following FDT sources:
  *      - multicomponent kernel/ramdisk/FDT image,
- *      - commandline provided address of decicated FDT image.
+ *      - commandline provided address of dedicated FDT image.
  *
  * Return:
  *     0, if fdt image was found and valid, or skipped
@@ -1104,6 +1105,9 @@ int booti_setup(ulong image, ulong *relocated_addr, ulong *size,
 #define FIT_STANDALONE_PROP	"standalone"
 #define FIT_SCRIPT_PROP		"script"
 #define FIT_PHASE_PROP		"phase"
+#define FIT_TFA_BL31_PROP	"tfa-bl31"
+#define FIT_TEE_PROP		"tee"
+#define FIT_COMPAT_PROP		"compatible"
 
 #define FIT_MAX_HASH_LEN	HASH_MAX_DIGEST_SIZE
 

@@ -16,6 +16,9 @@ the following dependencies are needed to build the documentation:
 
 * texinfo (if building the `Infodoc documentation`_)
 
+When submitting patches for documentation always build with KDOC_WERROR=1 to
+treat warnings as errors.
+
 HTML documentation
 ------------------
 
@@ -37,7 +40,7 @@ The *htmldocs* target is used to build the HTML documentation. It uses the
     # Display the documentation in a graphical web browser
     x-www-browser doc/output/index.html
 
-The HTML documentation is published at https://docs.u-boot.org. The build
+The HTML documentation is published at https://docs.u-boot-project.org. The build
 process for that site is controlled by the file *.readthedocs.yml*.
 
 Infodoc documentation

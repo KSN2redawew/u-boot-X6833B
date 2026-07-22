@@ -37,6 +37,7 @@ config OF_REAL
 
 config OF_BOARD_FIXUP
 	bool "Board-specific manipulation of Device Tree"
+	depends on !COMPILE_TEST
 	help
 	  In certain circumstances it is necessary to be able to modify
 	  U-Boot's device tree (e.g. to delete device from it). This option
@@ -58,7 +59,7 @@ config SPL_OF_CONTROL
 config TPL_OF_CONTROL
 	bool "Enable run-time configuration via Device Tree in TPL"
 	depends on TPL && OF_CONTROL
-	select TPL_OF_LIBFDT if !TPL_OF_PLATDATA
+	select TPL_OF_LIBFDT if !TPL_OF_PLATDATA && TPL_LIBGENERIC_SUPPORT
 	select TPL_OF_REAL if !TPL_OF_PLATDATA
 	help
 	  Some boards use device tree in U-Boot but only have 4KB of SRAM
@@ -87,6 +88,7 @@ config OF_LIVE
 
 config OF_UPSTREAM
 	bool "Enable use of devicetree imported from Linux kernel release"
+	depends on !COMPILE_TEST && !SANDBOX
 	help
 	  Traditionally, U-Boot platforms used to have their custom devicetree
 	  files or copy devicetree files from Linux kernel which are hard to
@@ -122,6 +124,8 @@ config OF_UPSTREAM_VENDOR
 	default "marvell" if ARCH_MVEBU || ARCH_KIRKWOOD
 	default "xilinx" if ARCH_VERSAL || ARCH_ZYNQ
 	default "nvidia" if ARCH_TEGRA
+	default "samsung" if ARCH_EXYNOS && 32BIT
+	default "exynos" if ARCH_EXYNOS && ARM64
 	help
 	  Select the vendor to build all devicetree files for.
 
@@ -213,6 +217,7 @@ config OF_OMIT_DTB
 config DEFAULT_DEVICE_TREE
 	string "Default Device Tree for DT control"
 	depends on OF_CONTROL
+	default "sandbox" if SANDBOX
 	help
 	  This option specifies the default Device Tree used for DT control.
 	  It can be overridden from the command line:
@@ -306,12 +311,13 @@ config MULTI_DTB_FIT_USER_DEF_ADDR
 
 config DTB_RESELECT
 	bool "Support swapping dtbs at a later point in boot"
+	depends on !COMPILE_TEST
 	depends on MULTI_DTB_FIT
 	help
-	  It is possible during initial boot you may need to use a generic
-	  dtb until you can fully determine the board your running on. This
-	  config allows boards to implement a function at a later point
-	  during boot to switch to the "correct" dtb.
+	  It is possible during initial boot you may need to use a generic dtb
+	  until you can fully determine the board you are running on. This
+	  config allows boards to implement a function at a later point during
+	  boot to switch to the "correct" dtb.
 
 config MULTI_DTB_FIT
 	bool "Support embedding several DTBs in a FIT image for u-boot"
@@ -403,16 +409,6 @@ config SPL_MULTI_DTB_FIT_USER_DEF_ADDR
 	   the FIT image containing the DTBs is uncompressed in an area defined
 	   at compilation time. This is the address of this area. It must be
 	   aligned on 2-byte boundary.
-
-config OF_TAG_MIGRATE
-	bool "Ease migration from old device trees with u-boot,dm- tags"
-	default y
-	help
-	  U-Boot moved over to use new tags to mark device tree nodes which need
-	  to be processed in SPL, before relocation, etc. Enable this option to
-	  detect old tags and handle them.
-
-	  Note: This option will be removed after the 2023.07 release.
 
 config OF_SPL_REMOVE_PROPS
 	string "List of device tree properties to drop for SPL"

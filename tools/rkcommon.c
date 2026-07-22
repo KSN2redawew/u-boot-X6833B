@@ -76,13 +76,29 @@ struct header0_info_v2 {
 /**
  * struct header0_info - header block for boot ROM
  *
- * This is stored at SD card block 64 (where each block is 512 bytes, or at
- * the start of SPI flash. It is encoded with RC4.
+ * This is stored at MMC block 64 (where each block is 512 bytes), or at
+ * the start of SPI flash. It is encoded with RC4 with the below rc4_key.
+ *
+ * In Rockchip terminology:
+ *
+ * "init" means the stage that is loaded into SRAM. TPL if there is one, SPL
+ * otherwise.
+ *
+ * "boot" means the next stages after "init" stage that are loaded by the
+ * BootROM into DRAM. Only applicable if "init" stage returns to BootROM (via
+ * the appropriate ROCKCHIP_BACK_TO_BROM symbol, BOOT_DEVICE_BOOTROM is used as
+ * boot device for the next stage and the "init" stage successfully booted) and
+ * if "init_boot_size" > "init_size".
+ * Basically, it is the content of "init" plus the SPL or even U-Boot proper if
+ * relevant.
  *
  * @magic:		Magic (must be RK_MAGIC)
  * @disable_rc4:	0 to use rc4 for boot image,  1 to use plain binary
- * @init_offset:	Offset in blocks of the SPL code from this header
- *			block. E.g. 4 means 2KB after the start of this header.
+ * @init_offset:	Offset in 512-byte blocks of the "init" code from the
+ *			start of this header. For instance, 4 means 2KiB.
+ * @init_size:		Size (in blocks) of the "init" code.
+ * @init_boot_size:	Size (in blocks) of the "init" and "boot" code combined.
+ *
  * Other fields are not used by U-Boot
  */
 struct header0_info {
@@ -132,12 +148,13 @@ static struct spl_info spl_infos[] = {
 	{ "rk3328", "RK32", 0x8000 - 0x800, false, RK_HEADER_V1 },
 	{ "rk3368", "RK33", 0x8000 - 0x1000, false, RK_HEADER_V1 },
 	{ "rk3399", "RK33", 0x30000 - 0x2000, false, RK_HEADER_V1 },
-	{ "rv1108", "RK11", 0x1800, false, RK_HEADER_V1 },
-	{ "rv1126", "110B", 0x10000 - 0x1000, false, RK_HEADER_V1 },
+	{ "rk3506", "RK35", 0xC000 - 0x1000, false, RK_HEADER_V2 },
 	{ "rk3528", "RK35", 0x10000 - 0x1000, false, RK_HEADER_V2 },
 	{ "rk3568", "RK35", 0x10000 - 0x1000, false, RK_HEADER_V2 },
 	{ "rk3576", "RK35", 0x80000 - 0x1000, false, RK_HEADER_V2 },
 	{ "rk3588", "RK35", 0x100000 - 0x1000, false, RK_HEADER_V2 },
+	{ "rv1108", "RK11", 0x1800, false, RK_HEADER_V1 },
+	{ "rv1126", "110B", 0x10000 - 0x1000, false, RK_HEADER_V1 },
 };
 
 /**
@@ -188,7 +205,7 @@ static int rkcommon_get_aligned_size(struct image_tool_params *params,
 
 	/*
 	 * Pad to a 2KB alignment, as required for init/boot size by the ROM
-	 * (see https://lists.denx.de/pipermail/u-boot/2017-May/293268.html)
+	 * (see https://patch.msgid.link/CANbgqAQPw5Dxp7Qm_aZoL1nggg9Mm1SQoKvx=V5a8p-9+DTDNw@mail.gmail.com/)
 	 */
 	return ROUND(size, RK_SIZE_ALIGN);
 }
@@ -279,7 +296,7 @@ bool rkcommon_need_rc4_spl(struct image_tool_params *params)
 	return info->spl_rc4;
 }
 
-bool rkcommon_is_header_v2(struct image_tool_params *params)
+static bool rkcommon_is_header_v2(struct image_tool_params *params)
 {
 	struct spl_info *info = rkcommon_get_spl_info(params->imagename);
 
@@ -311,7 +328,7 @@ static void rkcommon_set_header0(void *buf, struct image_tool_params *params)
 	 * to determine the size of the next-stage bootloader (e.g. U-Boot
 	 * proper), when used with the back-to-bootrom functionality.
 	 *
-	 * see https://lists.denx.de/pipermail/u-boot/2017-May/293267.html
+	 * see https://patch.msgid.link/CANbgqAQ5p-fE4T-Ye9UAMs-nRGU8AP_yxDf+5SbZbP8bxLa0dg@mail.gmail.com/
 	 * for a more detailed explanation by Andy Yan
 	 */
 	if (spl_params.boot_file)

@@ -13,14 +13,11 @@
 #include <asm/arch-rockchip/clock.h>
 #include <asm/arch-rockchip/cru_px30.h>
 #include <asm/arch-rockchip/hardware.h>
-#include <asm/global_data.h>
 #include <dm/device-internal.h>
 #include <dm/lists.h>
 #include <dt-bindings/clock/px30-cru.h>
 #include <linux/bitops.h>
 #include <linux/delay.h>
-
-DECLARE_GLOBAL_DATA_PTR;
 
 enum {
 	VCO_MAX_HZ	= 3200U * 1000000,
@@ -1360,6 +1357,9 @@ static ulong px30_clk_set_rate(struct clk *clk, ulong rate)
 	case SCLK_GMAC_RMII:
 		ret = px30_mac_set_speed_clk(priv, rate);
 		break;
+	/* Might occur in cru assigned-clocks, can be ignored here */
+	case SCLK_GPU:
+		break;
 #endif
 	default:
 		return -ENOENT;
@@ -1725,6 +1725,9 @@ static ulong px30_pmuclk_set_rate(struct clk *clk, ulong rate)
 		break;
 	case SCLK_UART0_PMU:
 		ret = px30_pmu_uart0_set_clk(priv, rate);
+		break;
+	/* Might occur in pmucru assigned-clocks, can be ignored here */
+	case SCLK_WIFI_PMU:
 		break;
 	default:
 		return -ENOENT;

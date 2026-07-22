@@ -15,13 +15,13 @@ struct altera_sdram_priv {
 	struct reset_ctl_bulk resets;
 };
 
-#if IS_ENABLED(CONFIG_TARGET_SOCFPGA_AGILEX5)
+#if IS_ENABLED(CONFIG_ARCH_SOCFPGA_AGILEX5)
 struct altera_sdram_plat {
 	fdt_addr_t mpfe_base_addr;
 	bool dualport;
 	bool dualemif;
 };
-#elif IS_ENABLED(CONFIG_TARGET_SOCFPGA_AGILEX7M)
+#elif IS_ENABLED(CONFIG_ARCH_SOCFPGA_AGILEX7M)
 enum memory_type {
 	DDR_MEMORY = 0,
 	HBM_MEMORY
@@ -77,7 +77,7 @@ struct altera_sdram_plat {
 #define DDR_HMC_INTMODE_INTMODE_SET_MSK		BIT(0)
 #define DDR_HMC_RSTHANDSHAKE_MASK		0x0000000f
 #define DDR_HMC_CORE2SEQ_INT_REQ		0x0000000f
-#define DDR_HMC_SEQ2CORE_INT_RESP_MASK		BIT(3)
+#define DDR_HMC_SEQ2CORE_INT_REQ_ACK_MASK	GENMASK(2, 0)
 #define DDR_HMC_HPSINTFCSEL_ENABLE_MASK		0x001f1f1f
 
 #define	DDR_HMC_ERRINTEN_INTMASK				\

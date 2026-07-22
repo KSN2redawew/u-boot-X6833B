@@ -3,6 +3,7 @@ config SCMI_FIRMWARE
 	select FIRMWARE
 	select OF_TRANSLATE
 	depends on SANDBOX || DM_MAILBOX || ARM_SMCCC || OPTEE
+	depends on OF_CONTROL
 	help
 	  System Control and Management Interface (SCMI) is a communication
 	  protocol that defines standard interfaces for power, performance
@@ -41,3 +42,11 @@ config SCMI_AGENT_OPTEE
 	help
 	  Enable the SCMI communication channel based on OP-TEE transport
 	  for compatible "linaro,scmi-optee".
+
+config SCMI_ID_VENDOR_80
+	bool
+
+config SCMI_ID_VENDOR_82
+	bool
+
+source "drivers/firmware/scmi/vendors/imx/Kconfig"

@@ -1,0 +1,283 @@
+/*
+ * SPDX-License-Identifier: (GPL-2.0 OR MIT)
+ */
+
+/dts-v1/;
+#include "mt6789.dtsi"
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/input/input.h>
+
+/ {
+	model = "Infinix NOTE 30";
+	chassis-type = "handset";
+	compatible = "infinix,x6833b", "mediatek,mt6789";
+
+	#address-cells = <2>;
+	#size-cells = <2>;
+
+	aliases {
+		serial0 = &uart0;
+	};
+
+	chosen {
+                #address-cells = <2>;
+                #size-cells = <2>;
+                ranges;
+
+                simplefb: framebuffer@fdfff000 {
+                        compatible = "simple-framebuffer";
+                        reg = <0x0 0xfdfff000 0x0 0x01eb0000>;
+                        width = <1080>;
+                        height = <2460>;
+                        stride = <4352>;
+                        format = "a8r8g8b8"; 
+                };
+        };
+
+	memory {
+		device_type = "memory";
+		reg = <0x0 0x40000000 0x3 0x0>;
+	};
+
+	reserved-memory {
+		#address-cells = <0x02>;
+		#size-cells = <0x02>;
+		ranges;
+
+		mblock-33-shared-dma-pool_wifi-reserve-memory_dma {
+			reg = <0x00 0xbf000000 0x00 0x600000>;
+			no-map;
+			compatible = "shared-dma-pool";
+		};
+
+		mblock-32-consys_emi_reserved {
+			reg = <0x00 0x7e000000 0x00 0x500000>;
+			no-map;
+			compatible = "mediatek,consys_emi_reserved";
+		};
+
+		mblock-31-sspm_ap-shared {
+			reg = <0x00 0x9f560000 0x00 0x110000>;
+			no-map;
+			compatible = "mediatek,sspm_ap-shared";
+		};
+
+		mblock-30-debug_met_res-ram {
+			reg = <0x00 0x9f670000 0x00 0x800000>;
+			no-map;
+			compatible = "mediatek,debug_met_res-ram";
+		};
+
+		mblock-29-ap_md_c_smem {
+			reg = <0x00 0x8c000000 0x00 0x16a0000>;
+			no-map;
+			compatible = "mediatek,ap_md_c_smem";
+		};
+
+		mblock-28-ap_md_nc_smem {
+			reg = <0x00 0x8e000000 0x00 0xe10000>;
+			no-map;
+			compatible = "mediatek,ap_md_nc_smem";
+		};
+
+		mblock-27-md_mem_usage {
+			reg = <0x00 0xe5200000 0x00 0xe00000>;
+			no-map;
+			compatible = "mediatek,md_mem_usage";
+		};
+
+		mblock-26-md_mem_usage {
+			reg = <0x00 0xe0800000 0x00 0x2c50000>;
+			no-map;
+			compatible = "mediatek,md_mem_usage";
+		};
+
+		mblock-25-md_mem_usage {
+			reg = <0x00 0xdfc00000 0x00 0x430000>;
+			no-map;
+			compatible = "mediatek,md_mem_usage";
+		};
+
+		mblock-24-md_mem_usage {
+			reg = <0x00 0xde000000 0x00 0x13f0000>;
+			no-map;
+			compatible = "mediatek,md_mem_usage";
+		};
+
+		mblock-23-ccci_tag_mem {
+			reg = <0x00 0xbf7f0000 0x00 0x10000>;
+			no-map;
+			compatible = "mediatek,ccci_tag_mem";
+		};
+
+		mblock-22-reserve-memory-scp_share {
+			reg = <0x00 0x8f000000 0x00 0x7a0000>;
+			no-map;
+			compatible = "mediatek,reserve-memory-scp_share";
+		};
+
+		mblock-21-SCP-reserved {
+			reg = <0x00 0xbf800000 0x00 0x600000>;
+			no-map;
+			compatible = "mediatek,SCP-reserved";
+		};
+
+		mblock-20-platform-debug_dfdmcu_dump {
+			reg = <0x00 0xff000000 0x00 0x100000>;
+			no-map;
+			compatible = "mediatek,platform-debug_dfdmcu_dump";
+		};
+
+		mblock-19-crypto_hw {
+			reg = <0x00 0x48401000 0x00 0x1000>;
+			no-map;
+			compatible = "mediatek,crypto_hw";
+		};
+
+		mblock-18-tee-reserved {
+			reg = <0x00 0x70000000 0x00 0x2000000>;
+			no-map;
+			compatible = "mediatek,tee-reserved";
+		};
+
+		mblock-17-tee-secmem {
+			reg = <0x00 0x7ea00000 0x00 0x800000>;
+			no-map;
+			compatible = "mediatek,tee-secmem";
+		};
+
+		mblock-16-MCUPM-reserved {
+			reg = <0x00 0x7feb0000 0x00 0x100000>;
+			no-map;
+			compatible = "mediatek,MCUPM-reserved";
+		};
+
+		mblock-15-SSPM-reserved {
+			reg = <0x00 0x9fe70000 0x00 0x180000>;
+			no-map;
+			compatible = "mediatek,SSPM-reserved";
+		};
+
+		mblock-14-BL31-reserved {
+			reg = <0x00 0x48200000 0x00 0x200000>;
+			no-map;
+			compatible = "mediatek,BL31-reserved";
+		};
+
+		mblock-13-framebuffer {
+                        reg = <0x00 0xfdfff000 0x00 0x01eb0000>;
+                        compatible = "mediatek,framebuffer";
+                };
+
+		mblock-12-aee_lk {
+			reg = <0x00 0x50700000 0x00 0x800000>;
+			compatible = "mediatek,aee_lk";
+		};
+
+		mblock-11-minirdump {
+			reg = <0x00 0x48170000 0x00 0x10000>;
+			no-map;
+			compatible = "mediatek,minirdump";
+		};
+
+		mblock-10-pstore {
+			reg = <0x00 0x48090000 0x00 0xe0000>;
+			no-map;
+			compatible = "mediatek,pstore";
+		};
+
+		mblock-9-aee_debug_kinfo {
+			reg = <0x00 0x48080000 0x00 0x10000>;
+			no-map;
+			compatible = "mediatek,aee_debug_kinfo";
+		};
+
+		mblock-8-atf-log-reserved {
+			reg = <0x00 0xbfe00000 0x00 0x200000>;
+			no-map;
+			compatible = "mediatek,atf-log-reserved";
+		};
+
+		mblock-7-log_store {
+			reg = <0x00 0x7ffbf000 0x00 0x40000>;
+			compatible = "mediatek,log_store";
+		};
+
+		mblock-6-gz-log {
+			reg = <0x00 0x7f200000 0x00 0x41000>;
+			compatible = "mediatek,gz-log";
+		};
+
+		mblock-5-unmap2 {
+			reg = <0x00 0x7f400000 0x00 0x400000>;
+			no-map;
+			compatible = "mediatek,unmap2";
+		};
+
+		mblock-4-gz {
+			reg = <0x00 0x7f800000 0x00 0x600000>;
+			no-map;
+			compatible = "mediatek,gz";
+		};
+
+		mblock-3-emi_mbist_buf {
+			reg = <0x00 0x7ffff000 0x00 0x1000>;
+			no-map;
+			compatible = "mediatek,emi_mbist_buf";
+		};
+
+		mblock-2-dramc-rk1 {
+			reg = <0x03 0x3ffff000 0x00 0x1000>;
+			no-map;
+			compatible = "mediatek,dramc-rk1";
+		};
+
+		mblock-1-dramc-rk0 {
+			reg = <0x01 0xbffff000 0x00 0x1000>;
+			no-map;
+			compatible = "mediatek,dramc-rk0";
+		};
+	};
+};
+
+&uart0 {
+	status = "okay";
+};
+
+&sdhc2 {
+	status = "okay";
+	cd-gpios = <&pio 7 GPIO_ACTIVE_LOW>;
+	bus-width = <4>;
+	max-frequency = <200000000>;
+
+//	pinctrl-names = "default", "state_uhs", "pull_down";
+//	pinctrl-0 = <&mmc1_pins_default>;
+//	pinctrl-1 = <&mmc1_pins_uhs>;
+//	pinctrl-2 = <&mmc1_pins_pull_down>;
+	cap-sd-highspeed;
+	sd-uhs-sdr12;
+	sd-uhs-sdr25;
+    sd-uhs-sdr50;
+    sd-uhs-sdr104;
+    sd-uhs-ddr50;
+	no-mmc;
+
+//	vmmc-supply = <&mt6358_vmch_eint_high>;
+//	vqmmc-supply = <&mt6358_vmc_reg>;
+
+};
+
+&ufshci {
+	status = "okay";
+};
+
+&usb {
+	status = "okay";
+
+	dr_mode = "peripheral";
+	maximum-speed = "high-speed";
+};
+
+&u2phy {
+	status = "okay";
+};

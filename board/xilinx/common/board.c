@@ -9,6 +9,7 @@
 #include <efi.h>
 #include <efi_loader.h>
 #include <env.h>
+#include <fwu.h>
 #include <image.h>
 #include <init.h>
 #include <jffs2/load_kernel.h>
@@ -68,6 +69,8 @@ struct efi_capsule_update_info update_info = {
 #define EEPROM_HDR_NO_OF_MAC_ADDR	4
 #define EEPROM_HDR_ETH_ALEN		ETH_ALEN
 #define EEPROM_HDR_UUID_LEN		16
+
+#define EEPROM_FRU_READ_RETRY		5
 
 struct xilinx_board_description {
 	u32 header;
@@ -206,8 +209,14 @@ static int xilinx_read_eeprom_fru(struct udevice *dev, char *name,
 	debug("%s: I2C EEPROM read pass data at %p\n", __func__,
 	      fru_content);
 
-	ret = dm_i2c_read(dev, 0, (uchar *)fru_content,
-			  eeprom_size);
+	i = 0;
+	do {
+		ret = dm_i2c_read(dev, 0, (uchar *)fru_content,
+				  eeprom_size);
+		if (!ret)
+			break;
+	} while (++i < EEPROM_FRU_READ_RETRY && ret == -ETIMEDOUT);
+
 	if (ret) {
 		debug("%s: I2C EEPROM read failed\n", __func__);
 		goto end;
@@ -499,8 +508,7 @@ int board_late_init_xilinx(void)
 				ret |= env_set_by_index("uuid", id, uuid);
 			}
 
-			if (!(CONFIG_IS_ENABLED(NET) ||
-			      CONFIG_IS_ENABLED(NET_LWIP)))
+			if (!CONFIG_IS_ENABLED(NET))
 				continue;
 
 			for (i = 0; i < EEPROM_HDR_NO_OF_MAC_ADDR; i++) {
@@ -742,4 +750,41 @@ __weak int board_rng_seed(struct abuf *buf)
 
 	return 0;
 }
+#endif
+
+#if defined(CONFIG_FWU_MULTI_BANK_UPDATE)
+int fwu_platform_hook(struct udevice *dev, struct fwu_data *data)
+{
+	/* Note: The FWU metadata is an unsecure piece of data, as
+	 * highlighted by the spec, and there is no way to ascertain
+	 * that it has not been tampered with in a malicious manner.
+	 * U-Boot OTOH can be part of a trusted boot chain, where the
+	 * U-Boot image has been verified before being booted. So,
+	 * although this does remove issues that might crop up with
+	 * manual mismatches, still need to consider the fact that
+	 * the FWU mdata is not a secure piece of data.
+
+	 * And this is a not real problem with Xilinx platforms because
+	 * actually it is only providing reference stack.
+	 */
+
+	struct fwu_image_entry *img_entry = &data->fwu_images[0];
+
+	/* Copy image type GUID */
+	memcpy(&fw_images[0].image_type_id, &img_entry->image_type_guid, 16);
+
+	if (IS_ENABLED(CONFIG_EFI_ESRT)) {
+		efi_status_t ret;
+
+		/* Rebuild the ESRT to reflect any updated FW images. */
+		ret = efi_esrt_populate();
+		if (ret != EFI_SUCCESS) {
+			log_warning("ESRT update failed\n");
+			return ret;
+		}
+	}
+
+	return 0;
+}
+
 #endif

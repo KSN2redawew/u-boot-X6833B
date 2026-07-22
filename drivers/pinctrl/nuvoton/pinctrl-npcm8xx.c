@@ -23,6 +23,7 @@
 #define TIPRSTC		0x50
 #define CORSTC		0x5c
 #define FLOCKR1		0x74
+#define INTCR		0x3c
 #define INTCR4		0xc0
 #define I2CSEGSEL	0xe0
 #define MFSEL1		0x260
@@ -165,6 +166,8 @@ struct npcm8xx_pinctrl_priv {
 			     213, 214, 215) \
 	FUNC(spix, MFSEL4, 27, 224, 225, 226, 227, 229, 230) \
 	FUNC(spixcs1, MFSEL4, 28, 228) \
+	FUNC(smb11ddcm, MFSEL4, 29) \
+	FUNC(smb11ddcs, MFSEL4, 30) \
 	FUNC(spi1cs1, MFSEL5, 0, 233) \
 	FUNC(jm2, MFSEL5, 1) \
 	FUNC(j2j3, MFSEL5, 2, 44, 62, 45, 46) \
@@ -280,6 +283,7 @@ struct npcm8xx_pinctrl_priv {
 	FUNC(lkgpo2, FLOCKR1, 8, 9) \
 	FUNC(nprd_smi, FLOCKR1, 20, 190) \
 	FUNC(mmcwp, FLOCKR1, 24, 153) \
+	FUNC(vcdhs, INTCR, 27) \
 	FUNC(rg2refck, INTCR4, 6) \
 	FUNC(r1en, INTCR4, 12) \
 	FUNC(r2en, INTCR4, 13) \
@@ -568,9 +572,9 @@ static const struct pin_info npcm8xx_pins[] = {
 	{189, "GPIO189/SPI3_D3/SPI3_nCS3", {FN_spi3quad, FN_spi3cs3, FN_gpio1889}, 3,
 	      DS(8, 12) | SLEW | GPIO_ALT | GPIO_IDX(2)},
 	{190, "GPIO190/nPRD_SMI", {FN_nprd_smi}, 1, DS(2, 4)},
-	{191, "GPIO191/SPI1_D1/FANIN17/FM1_D1/STRAP10",
+	{191, "GPIO191/SPI1_D2/SPI1_nCS2/FM1_D2/SMB15B_SDA",
 	      {FN_spi1d23, FN_spi1cs2, FN_fm1, FN_smb15}, 4, SLEW},
-	{192, "GPIO192/SPI1_D3/SPI_nCS3/FM1_D3/SMB15_SCL",
+	{192, "GPIO192/SPI1_D3/SPI_nCS3/FM1_D3/SMB15B_SCL",
 	      {FN_spi1d23, FN_spi1cs3, FN_fm1, FN_smb15}, 4, SLEW},
 	{193, "GPIO193/R1_CRSDV", {FN_r1}, 1, 0},
 	{194, "GPIO194/SMB0B_SCL/FM0_CK", {FN_smb0b, FN_fm0}, 2, SLEW},

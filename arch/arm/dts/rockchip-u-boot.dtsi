@@ -226,5 +226,40 @@
 		};
 	};
 #endif /* CONFIG_ROCKCHIP_SPI_IMAGE */
+
+#ifdef CONFIG_ROCKCHIP_MASKROM_IMAGE
+	simple-bin-usb471 {
+		filename = "u-boot-rockchip-usb471.bin";
+
+#ifdef CONFIG_ROCKCHIP_EXTERNAL_TPL
+		rockchip-tpl {
+		};
+#elif defined(CONFIG_TPL)
+		u-boot-tpl {
+			no-write-symbols;
+		};
+#endif
+	};
+
+	simple-bin-usb472 {
+		filename = "u-boot-rockchip-usb472.bin";
+		pad-byte = <0x00>;
+
+		u-boot-spl {
+		};
+
+		payload {
+			type = "section";
+			align = <CONFIG_SYS_CACHELINE_SIZE>;
+#ifdef HAS_FIT
+		fit {
+			insert-template = <&fit_template>;
+#else
+		u-boot-img {
+#endif
+		};
+		};
+	};
+#endif /* CONFIG_ROCKCHIP_MASKROM_IMAGE */
 };
 #endif /* CONFIG_SPL */

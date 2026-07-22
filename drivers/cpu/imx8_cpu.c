@@ -6,7 +6,6 @@
 #include <cpu.h>
 #include <dm.h>
 #include <thermal.h>
-#include <asm/global_data.h>
 #include <asm/ptrace.h>
 #include <asm/system.h>
 #include <firmware/imx/sci/sci.h>
@@ -17,8 +16,6 @@
 #include <linux/bitops.h>
 #include <linux/clk-provider.h>
 #include <linux/psci.h>
-
-DECLARE_GLOBAL_DATA_PTR;
 
 #define IMX_REV_LEN	4
 struct cpu_imx_plat {
@@ -113,6 +110,10 @@ static const char *get_imx_type_str(u32 imxtype)
 		return "91(01)";/* iMX91 9x9 Specific feature */
 	case MXC_CPU_IMX95:
 		return "95";
+	case MXC_CPU_IMX94:
+		return "94";
+	case MXC_CPU_IMX952:
+		return "952";
 	default:
 		return "??";
 	}
@@ -190,7 +191,7 @@ static int cpu_imx_get_temp(struct cpu_imx_plat *plat)
 		return 0xdeadbeef;
 	}
 
-	return cpu_tmp;
+	return cpu_tmp / 1000;
 }
 #else
 static int cpu_imx_get_temp(struct cpu_imx_plat *plat)
@@ -221,7 +222,7 @@ static int cpu_imx_get_desc(const struct udevice *dev, char *buf, int size)
 	ret = snprintf(buf, size, "NXP i.MX%s Rev%s %s at %u MHz",
 		       plat->type, plat->rev, plat->name, plat->freq_mhz);
 
-	if (IS_ENABLED(CONFIG_IMX_TMU)) {
+	if (!IS_ENABLED(CONFIG_IMX8)) { /* imx8 does not have segment fuse */
 		switch (get_cpu_temp_grade(&minc, &maxc)) {
 		case TEMP_AUTOMOTIVE:
 			grade = "Automotive temperature grade";
@@ -230,7 +231,10 @@ static int cpu_imx_get_desc(const struct udevice *dev, char *buf, int size)
 			grade = "Industrial temperature grade";
 			break;
 		case TEMP_EXTCOMMERCIAL:
-			grade = "Extended Consumer temperature grade";
+			if (IS_ENABLED(CONFIG_ARCH_IMX9))
+				grade = "Extended Industrial temperature grade";
+			else
+				grade = "Extended Consumer temperature grade";
 			break;
 		default:
 			grade = "Consumer temperature grade";

@@ -20,10 +20,11 @@ DECLARE_GLOBAL_DATA_PTR;
 #define JH7110_CLK_CPU_ROOT_SHIFT		24
 #define JH7110_CLK_CPU_ROOT_MASK		GENMASK(29, 24)
 
-void spl_perform_fixups(struct spl_image_info *spl_image)
+void spl_perform_board_fixups(struct spl_image_info *spl_image)
 {
 	/* Update the memory size which read from eeprom or DT */
-	fdt_fixup_memory(spl_image->fdt_addr, 0x40000000, gd->ram_size);
+	if (spl_image->fdt_addr)
+		fdt_fixup_memory(spl_image->fdt_addr, 0x40000000, gd->ram_size);
 }
 
 static void jh7110_jtag_init(void)
@@ -122,6 +123,17 @@ int board_fit_config_name_match(const char *name)
 	} else if (!strcmp(name, "starfive/jh7110-milkv-mars") &&
 		    !strncmp(get_product_id_from_eeprom(), "MARS", 4)) {
 		return 0;
+	} else if (!strcmp(name, "starfive/jh7110-milkv-marscm-emmc") &&
+		    !strncmp(get_product_id_from_eeprom(), "MARC", 4) &&
+		    get_mmc_size_from_eeprom()) {
+		return 0;
+	} else if (!strcmp(name, "starfive/jh7110-milkv-marscm-lite") &&
+		    !strncmp(get_product_id_from_eeprom(), "MARC", 4) &&
+		    !get_mmc_size_from_eeprom()) {
+		return 0;
+	} else if (!strcmp(name, "starfive/jh7110-orangepi-rv") &&
+		    !strncmp(get_product_id_from_eeprom(), "XOPIRV", 6)) {
+		return 0;
 	} else if (!strcmp(name, "starfive/jh7110-pine64-star64") &&
 		    !strncmp(get_product_id_from_eeprom(), "STAR64", 6)) {
 		return 0;
@@ -130,6 +142,9 @@ int board_fit_config_name_match(const char *name)
 		return 0;
 	} else if (!strcmp(name, "starfive/jh7110-starfive-visionfive-2-v1.3b") &&
 		    !strncmp(get_product_id_from_eeprom(), "VF7110B", 7)) {
+		return 0;
+	} else if (!strcmp(name, "starfive/jh7110-starfive-visionfive-2-lite") &&
+		    !strncmp(get_product_id_from_eeprom(), "VF7110SL", 8)) {
 		return 0;
 	}
 

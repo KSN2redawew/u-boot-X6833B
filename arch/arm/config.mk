@@ -23,21 +23,25 @@ endif
 
 PLATFORM_RELFLAGS += -fno-common $(FIXED_REG)
 PLATFORM_RELFLAGS += $(call cc-option, -msoft-float) \
-		     $(call cc-option,-mgeneral-regs-only) \
       $(call cc-option,-mshort-load-bytes,$(call cc-option,-malignment-traps,))
 
-# LLVM support
-LLVM_RELFLAGS		:= $(call cc-option,-mllvm,) \
-			$(call cc-option,-mno-movt,)
-PLATFORM_RELFLAGS	+= $(LLVM_RELFLAGS)
+ifeq ($(CONFIG_ARM64),y)
+PLATFORM_RELFLAGS += $(call cc-option,-mgeneral-regs-only)
+endif
 
+# LLVM support
+LLVM_RELFLAGS		:= $(call cc-option,-mllvm,)
 PLATFORM_CPPFLAGS += -D__ARM__
 
 ifdef CONFIG_ARM64
 PLATFORM_ELFFLAGS += -B aarch64 -O elf64-littleaarch64
 else
 PLATFORM_ELFFLAGS += -B arm -O elf32-littlearm
+# no-movt is only available when targeting AArch32
+LLVM_RELFLAGS	+= $(call cc-option,-mno-movt,)
 endif
+
+PLATFORM_RELFLAGS	+= $(LLVM_RELFLAGS)
 
 # Choose between ARM/Thumb instruction sets
 ifeq ($(CONFIG_$(PHASE_)SYS_THUMB_BUILD),y)
@@ -47,14 +51,14 @@ PF_CPPFLAGS_ARM		:= $(AFLAGS_IMPLICIT_IT) \
 			$(call cc-option,-marm,)\
 			$(call cc-option,-mno-thumb-interwork,)\
 		)
-else
+else ifneq ($(CONFIG_ARM64),y)
 PF_CPPFLAGS_ARM := $(call cc-option,-marm,) \
 		$(call cc-option,-mno-thumb-interwork,)
 endif
 
 # Only test once
 ifeq ($(CONFIG_$(PHASE_)SYS_THUMB_BUILD),y)
-archprepare: checkthumb checkgcc6
+archprepare: checkthumb checkgcc10
 
 checkthumb:
 	@if test "$(call cc-name)" = "gcc" -a \
@@ -65,13 +69,13 @@ checkthumb:
 		false; \
 	fi
 else
-archprepare: checkgcc6
+archprepare: checkgcc10
 endif
 
-checkgcc6:
+checkgcc10:
 	@if test "$(call cc-name)" = "gcc" -a \
-			"$(call cc-version)" -lt "0600"; then \
-		echo '*** Your GCC is older than 6.0 and is not supported'; \
+			"$(call cc-version)" -lt "1000"; then \
+		echo '*** Your GCC is older than 10.0 and is not supported'; \
 		false; \
 	fi
 
@@ -107,6 +111,14 @@ endif
 
 # needed for relocation
 LDFLAGS_u-boot += -pie
+
+ifeq ($(CONFIG_ARM64),y)
+# U-Boot uses fixed 4K granules, so we force the linker to match.
+# Otherwise, we're subject to toolchain preferences, (e.g Fedora's
+# aarch64-linux-none toolchain selects 64K granules) and we end up wasting
+# a lot of space in ELFs with MMU_PGPROT enabled.
+LDFLAGS_u-boot += -z common-page-size=0x1000 -z max-page-size=0x1000
+endif
 
 #
 # FIXME: binutils versions < 2.22 have a bug in the assembler where

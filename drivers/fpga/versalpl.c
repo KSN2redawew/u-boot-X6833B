@@ -17,7 +17,7 @@ static ulong versal_align_dma_buffer(ulong *buf, u32 len)
 
 	if ((ulong)buf != ALIGN((ulong)buf, ARCH_DMA_MINALIGN)) {
 		new_buf = (ulong *)ALIGN((ulong)buf, ARCH_DMA_MINALIGN);
-		memcpy(new_buf, buf, len);
+		memmove(new_buf, buf, len);
 		buf = new_buf;
 	}
 
@@ -40,13 +40,12 @@ static int versal_load(xilinx_desc *desc, const void *buf, size_t bsize,
 	buf_lo = lower_32_bits(bin_buf);
 	buf_hi = upper_32_bits(bin_buf);
 
-
 	if (desc->family == xilinx_versal2) {
 		ret = xilinx_pm_request(VERSAL_PM_LOAD_PDI, VERSAL_PM_PDI_TYPE, buf_hi,
-					buf_lo, 0, ret_payload);
+					buf_lo, 0, 0, 0, ret_payload);
 	} else {
 		ret = xilinx_pm_request(VERSAL_PM_LOAD_PDI, VERSAL_PM_PDI_TYPE, buf_lo,
-					buf_hi, 0, ret_payload);
+					buf_hi, 0, 0, 0, ret_payload);
 	}
 
 	if (ret)

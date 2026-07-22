@@ -408,6 +408,11 @@ M:	Jagan Teki <jagan@amarulasolutions.com>
 S:	Maintained
 F:	configs/nanopi_a64_defconfig
 
+NETCUBE KUMQUAT BOARD
+M:	Lukas Schmid <lukas.schmid@netcube.li>
+S:	Maintained
+F:	configs/netcube_kumquat_defconfig
+
 NINTENDO NES CLASSIC EDITION BOARD
 M:	FUKAUMI Naoki <naobsd@gmail.com>
 S:	Maintained
@@ -434,6 +439,11 @@ ORANGEPI 3 BOARD
 M:	Andre Heider <a.heider@gmail.com>
 S:	Maintained
 F:	configs/orangepi_3_defconfig
+
+ORANGEPI 4A BOARD
+M:	Chen-Yu Tsai <wens@kernel.org>
+S:	Maintained
+F:	configs/orangepi_4a_defconfig
 
 ORANGEPI LITE2 BOARD
 M:	Jagan Teki <jagan@amarulasolutions.com>
@@ -600,6 +610,11 @@ X96 MATE TV BOX
 M:	Andre Przywara <andre.przywara@arm.com>
 S:	Maintained
 F:	configs/x96_mate_defconfig
+
+X96Q TV BOX
+M:	J. Neuschäfer <j.ne@posteo.net>
+S:	Maintained
+F:	configs/x96q_defconfig
 
 X96Q PRO+ TV BOX
 M:	Andre Przywara <andre.przywara@arm.com>

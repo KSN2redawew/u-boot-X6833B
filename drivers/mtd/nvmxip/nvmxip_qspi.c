@@ -11,9 +11,6 @@
 #include <nvmxip.h>
 #include <linux/errno.h>
 
-#include <asm/global_data.h>
-DECLARE_GLOBAL_DATA_PTR;
-
 #define NVMXIP_QSPI_DRV_NAME "nvmxip_qspi"
 
 /**
@@ -49,7 +46,7 @@ static int nvmxip_qspi_of_to_plat(struct udevice *dev)
 		return -EINVAL;
 	}
 
-	log_debug("[%s]: XIP device base addr: 0x%p , lba_shift: %d , lbas: %lu\n",
+	log_debug("[%s]: XIP device base addr: 0x%p , lba_shift: %d , lbas: " LBAF "\n",
 		  dev->name, (void *)(uintptr_t)plat->phys_base, plat->lba_shift, plat->lba);
 
 	return 0;

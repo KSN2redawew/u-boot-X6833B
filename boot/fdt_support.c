@@ -27,6 +27,7 @@
 #include <fdtdec.h>
 #include <version.h>
 #include <video.h>
+#include <smbios.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -224,23 +225,14 @@ int fdt_initrd(void *fdt, ulong initrd_start, ulong initrd_end)
 	int is_u64;
 	uint64_t addr, size;
 
+	/* just return if the size of initrd is zero */
+	if (initrd_start == initrd_end)
+		return 0;
+
 	/* find or create "/chosen" node. */
 	nodeoffset = fdt_find_or_add_subnode(fdt, 0, "chosen");
 	if (nodeoffset < 0)
 		return nodeoffset;
-
-	/*
-	 * Although we didn't setup an initrd, there could be a stale
-	 * initrd setting from the previous boot firmware in the live
-	 * device tree. So, make sure there is no setting left if we
-	 * don't want an initrd.
-	 */
-	if (initrd_start == initrd_end) {
-		fdt_delprop(fdt, nodeoffset, "linux,initrd-start");
-		fdt_delprop(fdt, nodeoffset, "linux,initrd-end");
-
-		return 0;
-	}
 
 	total = fdt_num_mem_rsv(fdt);
 
@@ -342,6 +334,7 @@ int fdt_chosen(void *fdt)
 	int   nodeoffset;
 	int   err;
 	const char *str;		/* used to set string properties */
+	ulong smbiosaddr;		/* SMBIOS table address */
 
 	err = fdt_check_header(fdt);
 	if (err < 0) {
@@ -394,6 +387,23 @@ int fdt_chosen(void *fdt)
 		printf("WARNING: could not set u-boot,version %s.\n",
 		       fdt_strerror(err));
 		return err;
+	}
+
+	if (CONFIG_IS_ENABLED(GENERATE_SMBIOS_TABLE)) {
+		/* Inject SMBIOS address when we have a valid address.
+		* This is useful for systems using booti/bootm instead of bootefi.
+		* Failure to set this property is non-fatal, we only generate a
+		* warning.
+		*/
+		smbiosaddr = gd_smbios_start();
+		if (smbiosaddr) {
+			err = fdt_setprop_u64(fdt, nodeoffset, "smbios3-entrypoint",
+					smbiosaddr);
+			if (err < 0) {
+				printf("WARNING: could not set smbios3-entrypoint %s.\n",
+				fdt_strerror(err));
+			}
+		}
 	}
 
 	return fdt_fixup_stdout(fdt, nodeoffset);

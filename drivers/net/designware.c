@@ -125,6 +125,16 @@ static int dw_mdio_reset(struct mii_dev *bus)
 
 	return __dw_mdio_reset(dev);
 }
+
+#if IS_ENABLED(CONFIG_BITBANGMII)
+static int dw_bb_mdio_reset(struct mii_dev *bus)
+{
+	struct dw_eth_dev *priv = bus->priv;
+
+	return __dw_mdio_reset(priv->dev);
+}
+#endif
+
 #endif
 
 #if IS_ENABLED(CONFIG_DM_MDIO)
@@ -348,7 +358,7 @@ static int dw_bb_mdio_init(const char *name, struct udevice *dev)
 	bus->read = dw_bb_miiphy_read;
 	bus->write = dw_bb_miiphy_write;
 #if CONFIG_IS_ENABLED(DM_GPIO)
-	bus->reset = dw_mdio_reset;
+	bus->reset = dw_bb_mdio_reset;
 #endif
 	bus->priv = dwpriv;
 
@@ -894,7 +904,7 @@ int designware_eth_probe(struct udevice *dev)
 	if (ret) {
 		debug("%s: No phy supply\n", dev->name);
 	} else {
-		ret = regulator_set_enable(phy_supply, true);
+		ret = regulator_set_enable_if_allowed(phy_supply, true);
 		if (ret) {
 			puts("Error enabling phy supply\n");
 			return ret;

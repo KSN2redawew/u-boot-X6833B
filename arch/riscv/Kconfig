@@ -17,14 +17,17 @@ config TARGET_ANDES_VOYAGER
 config TARGET_BANANAPI_F3
 	bool "Support BananaPi F3 Board"
 
+config TARGET_BEAGLEBOARD_BEAGLEVFIRE
+	bool "Support BeagleBoard BeagleV-Fire Board (based on Microchip MPFS)"
+
 config TARGET_K230_CANMV
 	bool "Support K230 CanMV Board"
 
 config TARGET_LICHEERV_NANO
 	bool "Support LicheeRV Nano Board"
 
-config TARGET_MICROCHIP_ICICLE
-	bool "Support Microchip PolarFire-SoC Icicle Board"
+config TARGET_MICROCHIP_GENERIC
+	bool "Support Microchip PolarFire-SoC Boards"
 
 config TARGET_MILKV_DUO
 	bool "Support Milk-v Duo Board"
@@ -106,9 +109,10 @@ config SPL_ZERO_MEM_BEFORE_USE
 source "board/andestech/ae350/Kconfig"
 source "board/andestech/voyager/Kconfig"
 source "board/aspeed/ibex_ast2700/Kconfig"
+source "board/beagle/beaglev_fire/Kconfig"
 source "board/canaan/k230_canmv/Kconfig"
 source "board/emulation/qemu-riscv/Kconfig"
-source "board/microchip/mpfs_icicle/Kconfig"
+source "board/microchip/mpfs_generic/Kconfig"
 source "board/openpiton/riscv64/Kconfig"
 source "board/sifive/unleashed/Kconfig"
 source "board/sifive/unmatched/Kconfig"
@@ -126,6 +130,7 @@ source "arch/riscv/cpu/cv1800b/Kconfig"
 source "arch/riscv/cpu/fu540/Kconfig"
 source "arch/riscv/cpu/fu740/Kconfig"
 source "arch/riscv/cpu/ast2700/Kconfig"
+source "arch/riscv/cpu/mpfs/Kconfig"
 source "arch/riscv/cpu/generic/Kconfig"
 source "arch/riscv/cpu/jh7110/Kconfig"
 source "arch/riscv/cpu/k1/Kconfig"
@@ -343,9 +348,26 @@ endmenu
 
 config RISCV_ISA_A
 	bool "Standard extension for Atomic Instructions"
+	depends on RISCV_ISA_ZAAMO && RISCV_ISA_ZALRSC
 	default y
 	help
 	  Adds "A" to the ISA string passed to the compiler.
+
+config RISCV_ISA_ZAAMO
+	bool "Standard extension for Atomic Memory Operations"
+	default y
+	help
+	  Indicates the platform supports Zaamo extension for atomic memory
+	  operations. Hand-written Assembly routines won't use AMO
+	  instructions if set to n.
+
+config RISCV_ISA_ZALRSC
+	bool "Standard extension for LR/SC instructions"
+	default y
+	help
+	  Indicates the platform supports Zalrsc extension for load-reserved
+	  and store-conditional isntructions. Hand-written assembly routines
+	  won't use LR/SC instructions if set to n.
 
 config RISCV_ISA_ZICBOM
 	bool "Zicbom support"

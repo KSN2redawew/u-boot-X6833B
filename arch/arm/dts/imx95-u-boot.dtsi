@@ -96,6 +96,10 @@
 			};
 		};
 	};
+
+	imx95-cm7 {
+		compatible = "fsl,imx95-cm7";
+	};
 };
 
 &A55_0 {
@@ -200,6 +204,22 @@
 
 &osc_24m {
 	bootph-all;
+};
+
+&pcie0 {
+	assigned-clocks =<&scmi_clk IMX95_CLK_HSIOPLL_VCO>,
+					 <&scmi_clk IMX95_CLK_HSIOPLL>,
+					 <&scmi_clk IMX95_CLK_HSIOPCIEAUX>;
+	assigned-clock-parents = <0>, <&scmi_clk IMX95_CLK_HSIOPLL_VCO>,
+				 <&scmi_clk IMX95_CLK_SYSPLL1_PFD1_DIV2>;
+};
+
+&pcie1 {
+	assigned-clocks =<&scmi_clk IMX95_CLK_HSIOPLL_VCO>,
+					 <&scmi_clk IMX95_CLK_HSIOPLL>,
+					 <&scmi_clk IMX95_CLK_HSIOPCIEAUX>;
+	assigned-clock-parents = <0>, <&scmi_clk IMX95_CLK_HSIOPLL_VCO>,
+				 <&scmi_clk IMX95_CLK_SYSPLL1_PFD1_DIV2>;
 };
 
 &{/soc} {

@@ -461,7 +461,9 @@ ulong disk_blk_erase(struct udevice *dev, lbaint_t start, lbaint_t blkcnt);
 #ifdef CONFIG_XPL_BUILD
 # define part_print_ptr(x)	NULL
 # if defined(CONFIG_SPL_FS_EXT4) || defined(CONFIG_SPL_FS_FAT) || \
-	defined(CONFIG_SYS_MMCSD_RAW_MODE_U_BOOT_PARTITION)
+	defined(CONFIG_SPL_FS_SQUASHFS) || \
+	defined(CONFIG_SYS_MMCSD_RAW_MODE_U_BOOT_USE_PARTITION) || \
+	defined(CONFIG_SYS_MMCSD_RAW_MODE_U_BOOT_USE_PARTITION_TYPE)
 #  define part_get_info_ptr(x)	x
 # else
 #  define part_get_info_ptr(x)	NULL
@@ -508,6 +510,22 @@ struct part_driver {
 	 */
 	int (*test)(struct blk_desc *desc);
 };
+
+/**
+ * part_driver_get_info() - Call the part_driver's get_info method
+ *
+ * On success, string members of info are guaranteed to be properly
+ * initialized, though they may be empty.
+ *
+ * @drv:	Partition driver
+ * @desc:	Block device descriptor
+ * @part:	Partition number to read
+ * @info:	Returned partition information
+ *
+ * Return: 0 on success, negative errno on failure.
+ */
+int part_driver_get_info(struct part_driver *drv, struct blk_desc *desc, int part,
+			 struct disk_partition *info);
 
 /* Declare a new U-Boot partition 'driver' */
 #define U_BOOT_PART_TYPE(__name)					\
@@ -687,6 +705,20 @@ int write_mbr_partitions(struct blk_desc *dev,
 int layout_mbr_partitions(struct disk_partition *p, int count,
 			  lbaint_t total_sectors);
 
+/**
+ * part_get_mbr() - get the MBR partition record of a partition
+ *
+ * This function reads the MBR partition record for a given block
+ * device and partition number.
+ *
+ * @desc:	block device descriptor
+ * @part:	partition number for which to return the partition record
+ * @mbr:	MBR partition record
+ *
+ * Return:	0 on success, otherwise error
+ */
+int part_get_mbr(struct blk_desc *desc, int part, dos_partition_t *mbr);
+
 #endif
 
 #if CONFIG_IS_ENABLED(PARTITIONS)
@@ -727,6 +759,24 @@ int part_get_type_by_name(const char *name);
  */
 int part_get_bootable(struct blk_desc *desc);
 
+/**
+ * part_driver_lookup_type() - Look up the partition driver for a blk device
+ *
+ * If @desc->part_type is PART_TYPE_UNKNOWN, this checks each partition driver
+ * against the blk device to see if there is a valid partition table acceptable
+ * to that driver.
+ *
+ * If @desc->part_type is already set, it just returns the driver for that
+ * type, without testing if the driver can find a valid partition on the
+ * descriptor.
+ *
+ * On success it updates @desc->part_type if set to PART_TYPE_UNKNOWN on entry
+ *
+ * @desc: Device descriptor
+ * Return: Driver found, or NULL if none
+ */
+struct part_driver *part_driver_lookup_type(struct blk_desc *desc);
+
 #else
 static inline int part_driver_get_count(void)
 { return 0; }
@@ -736,6 +786,9 @@ static inline struct part_driver *part_driver_get_first(void)
 
 static inline bool part_get_bootable(struct blk_desc *desc)
 { return false; }
+
+static inline struct part_driver *part_driver_lookup_type(struct blk_desc *desc)
+{ return NULL; }
 
 #endif /* CONFIG_PARTITIONS */
 

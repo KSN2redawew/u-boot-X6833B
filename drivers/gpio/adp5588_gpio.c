@@ -5,10 +5,8 @@
  *
  * (C) Copyright 2022 - Analog Devices, Inc.
  *
- * Written and/or maintained by Timesys Corporation
+ * Written by Timesys Corporation
  *
- * Contact: Nathan Barrett-Morrison <nathan.morrison@timesys.com>
- * Contact: Greg Malysa <greg.malysa@timesys.com>
  *
  * Based on Michael Hennerich's Linux driver:
  * Michael Hennerich <michael.hennerich@analog.com>
@@ -168,7 +166,7 @@ static int adp5588_ofdata_platdata(struct udevice *dev)
 
 	revid = ret & ID_MASK;
 
-	printf("ADP5588 Detected: Rev %x, Rev ID %x\n", ret, revid);
+	printf("ADP558x Detected: Rev %x, Rev ID %x\n", ret, revid);
 
 	for (i = 0, ret = 0; i <= ADP5588_BANK(ADP5588_MAXGPIO); i++) {
 		plat->dat_out[i] = adp5588_gpio_read(dev, GPIO_DAT_OUT1 + i);
@@ -194,6 +192,7 @@ static const struct dm_gpio_ops adp5588_ops = {
 
 static const struct udevice_id adp5588_of_match_list[] = {
 	{ .compatible = "adi,adp5588"},
+	{ .compatible = "adi,adp5587"},
 	{ /* sentinel */ }
 };
 

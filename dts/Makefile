@@ -3,7 +3,7 @@
 # Copyright (c) 2011 The Chromium OS Authors.
 
 # This Makefile builds the internal U-Boot fdt if CONFIG_OF_CONTROL is
-# enabled. See doc/README.fdt-control for more details.
+# enabled. See doc/develop/devicetree/control.rst for more details.
 
 DEVICE_TREE ?= $(CONFIG_DEFAULT_DEVICE_TREE:"%"=%)
 ifeq ($(DEVICE_TREE),)
@@ -11,10 +11,14 @@ DEVICE_TREE := unset
 endif
 
 ifeq ($(CONFIG_OF_UPSTREAM),y)
+ifeq ($(CONFIG_CPU_V8M),y)
+dt_dir := dts/upstream/src/arm64
+else
 ifeq ($(CONFIG_ARM64),y)
 dt_dir := dts/upstream/src/arm64
 else
 dt_dir := dts/upstream/src/$(ARCH)
+endif
 endif
 else
 dt_dir := arch/$(ARCH)/dts
@@ -41,7 +45,7 @@ $(obj)/dt.dtb: $(DTB) $(objtree)/tools/fdtgrep FORCE
 	$(call if_changed,fdt_rm_props)
 else
 $(obj)/dt.dtb: $(DTB) FORCE
-	$(call if_changed,shipped)
+	$(call if_changed,copy)
 endif
 
 targets += dt.dtb

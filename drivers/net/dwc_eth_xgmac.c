@@ -140,9 +140,34 @@ static int xgmac_mdio_wait_idle(struct xgmac_priv *xgmac)
 				 XGMAC_TIMEOUT_100MS, true);
 }
 
+static u32 xgmac_set_clause(struct xgmac_priv *xgmac, int mdio_addr, int mdio_devad,
+			    int mdio_reg, bool is_c45)
+{
+	u32 hw_addr;
+	u32 val;
+
+	if (is_c45) {
+		val = readl(&xgmac->mac_regs->mdio_clause_22_port);
+		val &= ~BIT(mdio_addr);
+		writel(val, &xgmac->mac_regs->mdio_clause_22_port);
+		hw_addr = (mdio_addr << XGMAC_MAC_MDIO_ADDRESS_PA_SHIFT) |
+			   (mdio_reg & XGMAC_MAC_MDIO_REG_ADDR_C45P_MASK);
+		hw_addr |= mdio_devad << XGMAC_MAC_MDIO_ADDRESS_DA_SHIFT;
+	} else {
+		/* Set clause 22 format */
+		val = BIT(mdio_addr);
+		writel(val, &xgmac->mac_regs->mdio_clause_22_port);
+		hw_addr = (mdio_addr << XGMAC_MAC_MDIO_ADDRESS_PA_SHIFT) |
+			   (mdio_reg & XGMAC_MAC_MDIO_REG_ADDR_C22P_MASK);
+	}
+
+	return hw_addr;
+}
+
 static int xgmac_mdio_read(struct mii_dev *bus, int mdio_addr, int mdio_devad,
 			   int mdio_reg)
 {
+	bool is_c45 = (mdio_devad != MDIO_DEVAD_NONE);
 	struct xgmac_priv *xgmac = bus->priv;
 	u32 val;
 	u32 hw_addr;
@@ -159,19 +184,16 @@ static int xgmac_mdio_read(struct mii_dev *bus, int mdio_addr, int mdio_devad,
 		return ret;
 	}
 
-	/* Set clause 22 format */
-	val = BIT(mdio_addr);
-	writel(val, &xgmac->mac_regs->mdio_clause_22_port);
-
-	hw_addr = (mdio_addr << XGMAC_MAC_MDIO_ADDRESS_PA_SHIFT) |
-		   (mdio_reg & XGMAC_MAC_MDIO_REG_ADDR_C22P_MASK);
+	hw_addr = xgmac_set_clause(xgmac, mdio_addr, mdio_devad, mdio_reg, is_c45);
 
 	val = xgmac->config->config_mac_mdio <<
 	      XGMAC_MAC_MDIO_ADDRESS_CR_SHIFT;
 
-	val |= XGMAC_MAC_MDIO_ADDRESS_SADDR |
-	       XGMAC_MDIO_SINGLE_CMD_ADDR_CMD_READ |
-	       XGMAC_MAC_MDIO_ADDRESS_SBUSY;
+	if (!is_c45)
+		val |= XGMAC_MAC_MDIO_ADDRESS_SADDR;
+
+	val |= XGMAC_MDIO_SINGLE_CMD_ADDR_CMD_READ |
+		XGMAC_MAC_MDIO_ADDRESS_SBUSY;
 
 	ret = xgmac_mdio_wait_idle(xgmac);
 	if (ret) {
@@ -203,6 +225,7 @@ static int xgmac_mdio_read(struct mii_dev *bus, int mdio_addr, int mdio_devad,
 static int xgmac_mdio_write(struct mii_dev *bus, int mdio_addr, int mdio_devad,
 			    int mdio_reg, u16 mdio_val)
 {
+	bool is_c45 = (mdio_devad != MDIO_DEVAD_NONE);
 	struct xgmac_priv *xgmac = bus->priv;
 	u32 val;
 	u32 hw_addr;
@@ -219,21 +242,18 @@ static int xgmac_mdio_write(struct mii_dev *bus, int mdio_addr, int mdio_devad,
 		return ret;
 	}
 
-	/* Set clause 22 format */
-	val = BIT(mdio_addr);
-	writel(val, &xgmac->mac_regs->mdio_clause_22_port);
-
-	hw_addr = (mdio_addr << XGMAC_MAC_MDIO_ADDRESS_PA_SHIFT) |
-		   (mdio_reg & XGMAC_MAC_MDIO_REG_ADDR_C22P_MASK);
-
-	hw_addr |= (mdio_reg >> XGMAC_MAC_MDIO_ADDRESS_PA_SHIFT) <<
-		    XGMAC_MAC_MDIO_ADDRESS_DA_SHIFT;
+	hw_addr = xgmac_set_clause(xgmac, mdio_addr, mdio_devad, mdio_reg, is_c45);
 
 	val = (xgmac->config->config_mac_mdio <<
 	       XGMAC_MAC_MDIO_ADDRESS_CR_SHIFT);
 
-	val |= XGMAC_MAC_MDIO_ADDRESS_SADDR |
-		mdio_val | XGMAC_MDIO_SINGLE_CMD_ADDR_CMD_WRITE |
+	if (!is_c45) {
+		hw_addr |= (mdio_reg >> XGMAC_MAC_MDIO_ADDRESS_PA_SHIFT) <<
+			    XGMAC_MAC_MDIO_ADDRESS_DA_SHIFT;
+		val |= XGMAC_MAC_MDIO_ADDRESS_SADDR;
+	}
+
+	val |= mdio_val | XGMAC_MDIO_SINGLE_CMD_ADDR_CMD_WRITE |
 		XGMAC_MAC_MDIO_ADDRESS_SBUSY;
 
 	ret = xgmac_mdio_wait_idle(xgmac);
@@ -477,20 +497,6 @@ static int xgmac_start(struct udevice *dev)
 
 	xgmac->reg_access_ok = true;
 
-	ret = wait_for_bit_le32(&xgmac->dma_regs->mode,
-				XGMAC_DMA_MODE_SWR, false,
-				xgmac->config->swr_wait, false);
-	if (ret) {
-		pr_err("%s XGMAC_DMA_MODE_SWR stuck: %d\n", dev->name, ret);
-		goto err_stop_resets;
-	}
-
-	ret = xgmac->config->ops->xgmac_calibrate_pads(dev);
-	if (ret < 0) {
-		pr_err("%s xgmac_calibrate_pads() failed: %d\n", dev->name, ret);
-		goto err_stop_resets;
-	}
-
 	/*
 	 * if PHY was already connected and configured,
 	 * don't need to reconnect/reconfigure again
@@ -537,6 +543,20 @@ static int xgmac_start(struct udevice *dev)
 	if (ret < 0) {
 		pr_err("%s xgmac_adjust_link() failed: %d\n", dev->name, ret);
 		goto err_shutdown_phy;
+	}
+
+	ret = wait_for_bit_le32(&xgmac->dma_regs->mode,
+				XGMAC_DMA_MODE_SWR, false,
+				xgmac->config->swr_wait, false);
+	if (ret) {
+		pr_err("%s XGMAC_DMA_MODE_SWR stuck: %d\n", dev->name, ret);
+		goto err_stop_resets;
+	}
+
+	ret = xgmac->config->ops->xgmac_calibrate_pads(dev);
+	if (ret < 0) {
+		pr_err("%s xgmac_calibrate_pads() failed: %d\n", dev->name, ret);
+		goto err_stop_resets;
 	}
 
 	/* Configure MTL */
@@ -1186,7 +1206,7 @@ static const struct udevice_id xgmac_ids[] = {
 	{ }
 };
 
-U_BOOT_DRIVER(eth_xgmac) = {
+U_BOOT_DRIVER(dwc_eth_xgmac) = {
 	.name = "eth_xgmac",
 	.id = UCLASS_ETH,
 	.of_match = of_match_ptr(xgmac_ids),

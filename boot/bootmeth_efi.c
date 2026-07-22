@@ -16,6 +16,7 @@
 #include <efi.h>
 #include <efi_loader.h>
 #include <env.h>
+#include <extension_board.h>
 #include <fs.h>
 #include <malloc.h>
 #include <mapmem.h>
@@ -99,8 +100,11 @@ static int distro_efi_check(struct udevice *dev, struct bootflow_iter *iter)
 static int distro_efi_try_bootflow_files(struct udevice *dev,
 					 struct bootflow *bflow)
 {
+	ulong fdt_addr, size, overlay_addr;
+	const struct extension *extension;
+	struct fdt_header *working_fdt;
 	struct blk_desc *desc = NULL;
-	ulong fdt_addr, size;
+	struct alist *extension_list;
 	char fname[256];
 	int ret, seq;
 
@@ -148,23 +152,66 @@ static int distro_efi_try_bootflow_files(struct udevice *dev,
 			return log_msg_ret("fil", -ENOMEM);
 	}
 
-	if (!ret) {
-		bflow->fdt_size = size;
-		bflow->fdt_addr = fdt_addr;
-
-		/*
-		 * TODO: Apply extension overlay
-		 *
-		 * Here we need to load and apply the extension overlay. This is
-		 * not implemented. See do_extension_apply(). The extension
-		 * stuff needs an implementation in boot/extension.c so it is
-		 * separate from the command code. Really the extension stuff
-		 * should use the device tree and a uclass / driver interface
-		 * rather than implementing its own list
-		 */
-	} else {
+	if (ret) {
 		log_debug("No device tree available\n");
 		bflow->flags |= BOOTFLOWF_USE_BUILTIN_FDT;
+		return 0;
+	}
+
+	bflow->fdt_size = size;
+	bflow->fdt_addr = fdt_addr;
+
+	if (!CONFIG_IS_ENABLED(SUPPORT_EXTENSION_SCAN))
+		return 0;
+
+	ret = extension_scan();
+	if (ret < 0)
+		return 0;
+
+	extension_list = extension_get_list();
+	if (!extension_list)
+		return 0;
+
+	working_fdt = map_sysmem(fdt_addr, 0);
+	if (fdt_check_header(working_fdt))
+		return 0;
+
+	overlay_addr = env_get_hex("extension_overlay_addr", 0);
+	if (!overlay_addr) {
+		log_debug("Environment extension_overlay_addr is missing\n");
+		return 0;
+	}
+
+	alist_for_each(extension, extension_list) {
+		char *overlay_file;
+		int len;
+
+		len = sizeof(EFI_DIRNAME) + strlen(extension->overlay);
+		overlay_file = calloc(1, len);
+		if (!overlay_file)
+			return -ENOMEM;
+
+		snprintf(overlay_file, len, "%s%s", EFI_DIRNAME,
+			 extension->overlay);
+
+		ret = bootmeth_common_read_file(dev, bflow, overlay_file,
+						overlay_addr,
+						(enum bootflow_img_t)IH_TYPE_FLATDT,
+						&size);
+		if (ret) {
+			log_debug("Failed loading overlay %s\n", overlay_file);
+			free(overlay_file);
+			continue;
+		}
+
+		ret = extension_apply(working_fdt, size);
+		if (ret) {
+			log_debug("Failed applying overlay %s\n", overlay_file);
+			free(overlay_file);
+			continue;
+		}
+		bflow->fdt_size += size;
+		free(overlay_file);
 	}
 
 	return 0;
@@ -222,16 +269,21 @@ static int distro_efi_read_bootflow_net(struct bootflow *bflow)
 		return log_msg_ret("fi0", -ENOMEM);
 
 	/* read the DT file also */
+	ret = efi_get_distro_fdt_name(fname, sizeof(fname), 0);
+	if (ret == -EALREADY) {
+		/* Prior-stage FDT is used, no download needed */
+		bflow->flags |= BOOTFLOWF_USE_PRIOR_FDT;
+		bflow->state = BOOTFLOWST_READY;
+		return 0;
+	} else if (ret) {
+		return log_msg_ret("nam", ret);
+	}
+
 	fdt_addr_str = env_get("fdt_addr_r");
 	if (!fdt_addr_str)
 		return log_msg_ret("fdt", -EINVAL);
 	fdt_addr = hextoul(fdt_addr_str, NULL);
 	sprintf(file_addr, "%lx", fdt_addr);
-
-	/* We only allow the first prefix with PXE */
-	ret = efi_get_distro_fdt_name(fname, sizeof(fname), 0);
-	if (ret)
-		return log_msg_ret("nam", ret);
 
 	bflow->fdt_fname = strdup(fname);
 	if (!bflow->fdt_fname)

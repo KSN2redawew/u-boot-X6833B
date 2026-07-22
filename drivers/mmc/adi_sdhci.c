@@ -2,10 +2,8 @@
 /*
  * (C) Copyright 2022 - Analog Devices, Inc.
  *
- * Written and/or maintained by Timesys Corporation
+ * Written by Timesys Corporation
  *
- * Contact: Nathan Barrett-Morrison <nathan.morrison@timesys.com>
- * Contact: Greg Malysa <greg.malysa@timesys.com>
  *
  * Based on Rockchip's sdhci.c file
  */
@@ -15,6 +13,7 @@
 #include <malloc.h>
 #include <sdhci.h>
 #include <asm/cache.h>
+#include <linux/sizes.h>
 
 /* 400KHz is max freq for card ID etc. Use that as min */
 #define EMMC_MIN_FREQ	400000

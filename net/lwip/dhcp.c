@@ -8,6 +8,7 @@
 #include <dm/device.h>
 #include <linux/delay.h>
 #include <linux/errno.h>
+#include <lwip/apps/sntp.h>
 #include <lwip/dhcp.h>
 #include <lwip/dns.h>
 #include <lwip/timeouts.h>
@@ -29,9 +30,10 @@ static void call_lwip_dhcp_fine_tmr(void *ctx)
 
 static int dhcp_loop(struct udevice *udev)
 {
-	char ipstr[] = "ipaddr\0\0";
-	char maskstr[] = "netmask\0\0";
-	char gwstr[] = "gatewayip\0\0";
+	char ipstr[] = "ipaddr\0\0\0";
+	char maskstr[] = "netmask\0\0\0";
+	char gwstr[] = "gatewayip\0\0\0";
+	const ip_addr_t *ntpserverip;
 	unsigned long start;
 	struct netif *netif;
 	struct dhcp *dhcp;
@@ -47,6 +49,13 @@ static int dhcp_loop(struct udevice *udev)
 	netif = net_lwip_new_netif_noip(udev);
 	if (!netif)
 		return CMD_RET_FAILURE;
+
+	/*
+	 * Request the DHCP stack to parse and store the NTP servers for
+	 * eventual use by the SNTP command
+	 */
+	if (CONFIG_IS_ENABLED(CMD_SNTP))
+		sntp_servermode_dhcp(1);
 
 	start = get_timer(0);
 
@@ -84,14 +93,17 @@ static int dhcp_loop(struct udevice *udev)
 		sprintf(maskstr, "netmask%d", idx);
 		sprintf(gwstr, "gatewayip%d", idx);
 	} else {
-		net_ip.s_addr = dhcp->offered_ip_addr.addr;
+		net_ip.s_addr = ip_addr_get_ip4_u32(&dhcp->offered_ip_addr);
 	}
 
 	env_set(ipstr, ip4addr_ntoa(&dhcp->offered_ip_addr));
 	env_set(maskstr, ip4addr_ntoa(&dhcp->offered_sn_mask));
 	env_set("serverip", ip4addr_ntoa(&dhcp->server_ip_addr));
-	if (dhcp->offered_gw_addr.addr != 0)
+	if (!ip4_addr_isany(&dhcp->offered_gw_addr))
 		env_set(gwstr, ip4addr_ntoa(&dhcp->offered_gw_addr));
+	if (!ip4_addr_isany(&dhcp->offered_si_addr) &&
+	    !ip4_addr_eq(&dhcp->offered_si_addr, &dhcp->server_ip_addr))
+		env_set("tftpserverip", ip4addr_ntoa(&dhcp->offered_si_addr));
 
 #ifdef CONFIG_PROT_DNS_LWIP
 	env_set("dnsip", ip4addr_ntoa(dns_getserver(0)));
@@ -102,6 +114,11 @@ static int dhcp_loop(struct udevice *udev)
 		strncpy(boot_file_name, dhcp->boot_file_name,
 			sizeof(boot_file_name));
 #endif
+	if (CONFIG_IS_ENABLED(CMD_SNTP)) {
+		ntpserverip = sntp_getserver(1);
+		if (ntpserverip != IP_ADDR_ANY)
+			env_set("ntpserverip", ip4addr_ntoa(ntpserverip));
+	}
 
 	printf("DHCP client bound to address %pI4 (%lu ms)\n",
 	       &dhcp->offered_ip_addr, get_timer(start));
@@ -121,40 +138,25 @@ int do_dhcp(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 	dev = eth_get_dev();
 	if (!dev) {
 		log_err("No network device\n");
-		return CMD_RET_FAILURE;
+		ret = CMD_RET_FAILURE;
+		goto out;
 	}
 
 	ret = dhcp_loop(dev);
 	if (ret)
-		return ret;
+		goto out;
 
 	if (argc > 1) {
 		struct cmd_tbl cmdtp = {};
 
-		return do_tftpb(&cmdtp, 0, argc, argv);
+		ret = do_tftpb(&cmdtp, 0, argc, argv);
+		goto out;
 	}
 
-	return CMD_RET_SUCCESS;
-}
+	ret = CMD_RET_SUCCESS;
 
-int dhcp_run(ulong addr, const char *fname, bool autoload)
-{
-	char *dhcp_argv[] = {"dhcp", NULL, };
-#ifdef CONFIG_CMD_TFTPBOOT
-	char *tftp_argv[] = {"tftpboot", boot_file_name, NULL, };
-#endif
-	struct cmd_tbl cmdtp = {};	/* dummy */
+out:
+	net_lwip_eth_stop();
 
-	if (autoload) {
-#ifdef CONFIG_CMD_TFTPBOOT
-		/* Assume DHCP was already performed */
-		if (boot_file_name[0])
-			return do_tftpb(&cmdtp, 0, 2, tftp_argv);
-		return 0;
-#else
-		return -EOPNOTSUPP;
-#endif
-	}
-
-	return do_dhcp(&cmdtp, 0, 1, dhcp_argv);
+	return ret;
 }

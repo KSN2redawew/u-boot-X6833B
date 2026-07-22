@@ -1,6 +1,12 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 /*
  * Copyright (C) 2019 MediaTek Inc.
+<<<<<<< HEAD
+=======
+ * Copyright (c) 2025, Igor Belwon <igor.belwon@mentallysanemainliners.org>
+ *
+ * Slimmed down header from Linux: drivers/ufs/host/ufs-mediatek.h
+>>>>>>> denx/master
  */
 
 #ifndef _UFS_MEDIATEK_H
@@ -151,7 +157,11 @@ struct ufs_mtk_mcq_intr_info {
 };
 
 struct ufs_mtk_host {
+<<<<<<< HEAD
 	struct phy *mphy;
+=======
+	struct phy mphy;
+>>>>>>> denx/master
 	struct reset_ctl *unipro_reset;
 	struct reset_ctl *crypto_reset;
 	struct reset_ctl *hci_reset;

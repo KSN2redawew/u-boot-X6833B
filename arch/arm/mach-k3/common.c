@@ -30,6 +30,9 @@
 #include <soc.h>
 #include <dm/uclass-internal.h>
 #include <dm/device-internal.h>
+#include <asm/armv8/mmu.h>
+#include <mach/k3-common-fdt.h>
+#include <mach/k3-ddr.h>
 
 #define PROC_BOOT_CTRL_FLAG_R5_CORE_HALT	0x00000001
 #define PROC_BOOT_STATUS_FLAG_R5_WFI		0x00000002
@@ -258,7 +261,157 @@ void board_prep_linux(struct bootm_headers *images)
 				 ROUND(images->os.end,
 				       CONFIG_SYS_CACHELINE_SIZE));
 }
+
+void enable_caches(void)
+{
+	void *fdt = (void *)gd->fdt_blob;
+	int ret;
+
+	ret = mem_map_from_dram_banks(K3_MEM_MAP_FIRST_BANK_IDX, K3_MEM_MAP_LEN,
+				     PTE_BLOCK_MEMTYPE(MT_NORMAL) |
+					     PTE_BLOCK_INNER_SHARE);
+	if (ret)
+		debug("%s: Failed to setup dram banks\n", __func__);
+
+	ret = fdt_fixup_reserved(fdt);
+	if (ret)
+		printf("%s: Failed to perform reserved-memory fixups (%s)\n",
+		       __func__, fdt_strerror(ret));
+
+	mmu_setup();
+
+	if (CONFIG_K3_ATF_LOAD_ADDR >= CFG_SYS_SDRAM_BASE) {
+		ret = mmu_unmap_reserved_mem("tfa", true);
+		if (ret)
+			printf("%s: Failed to unmap tfa reserved mem (%d)\n",
+			       __func__, ret);
+	}
+
+	if (CONFIG_K3_OPTEE_LOAD_ADDR >= CFG_SYS_SDRAM_BASE) {
+		ret = mmu_unmap_reserved_mem("optee", true);
+		if (ret)
+			printf("%s: Failed to unmap optee reserved mem (%d)\n",
+			       __func__, ret);
+	}
+
+	mmu_enable();
+	icache_enable();
+	dcache_enable();
+}
 #endif
+
+__weak char k3_get_speed_grade(void)
+{
+	return K3_SPEED_GRADE_UNKNOWN;
+}
+
+__weak const struct k3_speed_grade_map *k3_get_speed_grade_map(void)
+{
+	return NULL;
+}
+
+static int k3_fdt_set_assigned_clk_rate(const char *path, const char *clk_name,
+					unsigned int new_clk_rate)
+{
+	int size, clk_name_index, phandle_count;
+	struct ofnode_phandle_args phandle_args;
+	unsigned int dev_id, clock_id, i;
+	ofnode node = ofnode_path(path);
+	u32 *clk_rates;
+	int ret;
+
+	debug("%s: Setting clock '%s' frequency of '%s' to %u\n", __func__,
+	      path, clk_name, new_clk_rate);
+
+	clk_name_index =
+		ofnode_stringlist_search(node, "clock-names", clk_name);
+	if (clk_name_index < 0)
+		return clk_name_index;
+
+	ret = ofnode_parse_phandle_with_args(node, "clocks", "#clock-cells", 0,
+					     clk_name_index, &phandle_args);
+
+	if (ret || phandle_args.args_count != 2)
+		return -EINVAL;
+
+	dev_id = phandle_args.args[0];
+	clock_id = phandle_args.args[1];
+
+	debug("%s: Found dev_id: %u, clock_id: %u\n", __func__, dev_id,
+	      clock_id);
+
+	phandle_count = ofnode_count_phandle_with_args(node, "assigned-clocks",
+						       "#clock-cells", 0);
+
+	for (i = 0; i < phandle_count; i++) {
+		ret = ofnode_parse_phandle_with_args(node, "assigned-clocks",
+						     "#clock-cells", 0, i,
+						     &phandle_args);
+
+		if (ret || phandle_args.args_count != 2)
+			continue;
+
+		if (phandle_args.args[0] == dev_id &&
+		    phandle_args.args[1] == clock_id) {
+			clk_rates = (u32 *)ofnode_read_prop(node,
+				"assigned-clock-rates", &size);
+
+			if (i >= (size / sizeof(u32)))
+				return -EOVERFLOW;
+
+			clk_rates[i] = cpu_to_fdt32(new_clk_rate);
+			return 0;
+		}
+	}
+
+	return -EINVAL;
+}
+
+static u32 k3_get_a_core_frequency(char speed_grade)
+{
+	const struct k3_speed_grade_map *map = k3_get_speed_grade_map();
+	unsigned int i;
+
+	if (!map)
+		return 0;
+
+	for (i = 0; map[i].speed_grade != 0; i++) {
+		if (map[i].speed_grade == speed_grade)
+			return map[i].a_core_frequency;
+	}
+
+	return 0;
+}
+
+void k3_fix_rproc_clock(const char *path)
+{
+	u32 a_core_frequency;
+	char speed_grade;
+	int ret;
+
+	if (IS_ENABLED(CONFIG_ARM64))
+		return;
+
+	speed_grade = k3_get_speed_grade();
+	a_core_frequency = k3_get_a_core_frequency(speed_grade);
+
+	if (!a_core_frequency) {
+		printf("%s: Failed to get speed grade frequency\n", __func__);
+		return;
+	}
+
+	ret = k3_fdt_set_assigned_clk_rate(path, "core", a_core_frequency);
+	if (ret)
+		printf("Failed to set clock rates for '%s': %d\n", path, ret);
+	else
+		printf("Set clock rates for '%s', CPU: %dMHz at Speed Grade '%c'\n",
+		       path, a_core_frequency / 1000000, speed_grade);
+}
+
+__weak phys_addr_t board_get_usable_ram_top(phys_size_t total_size)
+{
+	return gd->ram_top;
+}
 
 void spl_enable_cache(void)
 {
@@ -267,11 +420,13 @@ void spl_enable_cache(void)
 	int ret = 0;
 
 	dram_init();
+	dram_init_banksize();
 
 	/* reserve TLB table */
 	gd->arch.tlb_size = PGTABLE_SIZE;
 
 	gd->ram_top += get_effective_memsize();
+	gd->ram_top = board_get_usable_ram_top(0);
 	gd->relocaddr = gd->ram_top;
 
 	ret = spl_reserve_video_from_ram_top();
@@ -303,8 +458,106 @@ static __maybe_unused void k3_dma_remove(void)
 		pr_warn("DMA Device not found (err=%d)\n", rc);
 }
 
+static int k3_falcon_fdt_add_bootargs(void *fdt)
+{
+	struct disk_partition info;
+	struct blk_desc *dev_desc;
+	char bootmedia[32];
+	char bootpart[32];
+	char str[256];
+	int ret;
+
+	strlcpy(bootmedia, env_get("boot"), sizeof(bootmedia));
+	strlcpy(bootpart, env_get("bootpart"), sizeof(bootpart));
+	ret = blk_get_device_part_str(bootmedia, bootpart, &dev_desc, &info, 0);
+	if (ret < 0) {
+		printf("%s: Failed to get part details for %s %s [%d]\n",
+		       __func__, bootmedia, bootpart, ret);
+		return ret;
+	}
+
+	if (!CONFIG_IS_ENABLED(PARTITION_UUIDS)) {
+		printf("ERROR: Failed to find rootfs PARTUUID\n");
+		printf("%s: CONFIG_SPL_PARTITION_UUIDS not enabled\n",
+		       __func__);
+		return -EOPNOTSUPP;
+	}
+
+	snprintf(str, sizeof(str), "console=%s root=PARTUUID=%s rootwait",
+		 env_get("console"), disk_partition_uuid(&info));
+
+	ret = fdt_find_and_setprop(fdt, "/chosen", "bootargs", str,
+				   strlen(str) + 1, 1);
+	if (ret) {
+		printf("%s: Could not set bootargs: %s\n", __func__,
+		       fdt_strerror(ret));
+		return ret;
+	}
+
+	debug("%s: Set bootargs to: %s\n", __func__, str);
+	return 0;
+}
+
+int k3_falcon_fdt_fixup(void *fdt)
+{
+	int ret;
+
+	if (!fdt)
+		return -EINVAL;
+
+	fdt_set_totalsize(fdt, fdt_totalsize(fdt) + CONFIG_SYS_FDT_PAD);
+
+	if (fdt_path_offset(fdt, "/chosen/bootargs") < 0) {
+		ret = k3_falcon_fdt_add_bootargs(fdt);
+
+		if (ret)
+			return ret;
+	}
+
+	if (IS_ENABLED(CONFIG_OF_BOARD_SETUP)) {
+		ret = ft_board_setup(fdt, gd->bd);
+		if (ret) {
+			printf("%s: Failed in board setup: %s\n", __func__,
+			       fdt_strerror(ret));
+			return ret;
+		}
+	}
+
+	if (IS_ENABLED(CONFIG_OF_SYSTEM_SETUP)) {
+		ret = ft_system_setup(fdt, gd->bd);
+		if (ret) {
+			printf("%s: Failed in system setup: %s\n", __func__,
+			       fdt_strerror(ret));
+			return ret;
+		}
+	}
+
+	return 0;
+}
+
+void spl_perform_arch_fixups(struct spl_image_info *spl_image)
+{
+	void *fdt = spl_image_fdt_addr(spl_image);
+
+	if (!fdt)
+		return;
+
+	fdt_fixup_reserved(fdt);
+
+	if (IS_ENABLED(CONFIG_SPL_OS_BOOT))
+		k3_falcon_fdt_fixup(fdt);
+}
+
 void spl_board_prepare_for_boot(void)
 {
+#if IS_ENABLED(CONFIG_SPL_OS_BOOT_SECURE) && !IS_ENABLED(CONFIG_ARM64)
+	int ret;
+
+	ret = k3_r5_falcon_prep();
+	if (ret)
+		panic("%s: Failed to boot in falcon mode: %d\n", __func__, ret);
+#endif /* falcon mode on R5 SPL */
+
 #if !(defined(CONFIG_SYS_ICACHE_OFF) && defined(CONFIG_SYS_DCACHE_OFF))
 	dcache_disable();
 #endif
@@ -322,17 +575,6 @@ void spl_board_prepare_for_linux(void)
 
 int misc_init_r(void)
 {
-	if (IS_ENABLED(CONFIG_TI_AM65_CPSW_NUSS)) {
-		struct udevice *dev;
-		int ret;
-
-		ret = uclass_get_device_by_driver(UCLASS_MISC,
-						  DM_DRIVER_GET(am65_cpsw_nuss),
-						  &dev);
-		if (ret)
-			printf("Failed to probe am65_cpsw_nuss driver\n");
-	}
-
 	if (IS_ENABLED(CONFIG_TI_ICSSG_PRUETH)) {
 		struct udevice *dev;
 		int ret;
@@ -436,3 +678,11 @@ release_proc_ctrl:
 	proc_ops->proc_release(ti_sci, PROC_ID_MCU_R5FSS0_CORE1);
 	return ret;
 }
+
+#if IS_ENABLED(CONFIG_ARM64) && IS_ENABLED(CONFIG_SPL_OS_BOOT_SECURE)
+int spl_start_uboot(void)
+{
+	/* Always boot to linux on Cortex-A SPL with CONFIG_SPL_OS_BOOT set */
+	return 0;
+}
+#endif

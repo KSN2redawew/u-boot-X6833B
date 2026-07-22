@@ -148,7 +148,7 @@ static int env_sf_save(void)
 
 	puts("done\n");
 
-	gd->env_valid = gd->env_valid == ENV_REDUND ? ENV_VALID : ENV_REDUND;
+	gd->env_valid = gd->env_valid == ENV_VALID ? ENV_REDUND : ENV_VALID;
 
 	printf("Valid environment: %d\n", (int)gd->env_valid);
 
@@ -396,7 +396,8 @@ static int env_sf_init_early(void)
 
 	if (IS_ENABLED(CONFIG_ENV_REDUNDANT)) {
 		read2_fail = spi_flash_read(env_flash,
-					    CONFIG_ENV_OFFSET_REDUND,
+					    IF_ENABLED_INT(CONFIG_ENV_REDUNDANT,
+							   CONFIG_ENV_OFFSET_REDUND),
 					    CONFIG_ENV_SIZE, tmp_env2);
 		ret = env_check_redund((char *)tmp_env1, read1_fail,
 				       (char *)tmp_env2, read2_fail);

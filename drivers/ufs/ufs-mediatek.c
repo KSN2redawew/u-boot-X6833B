@@ -2,7 +2,11 @@
 /*
  * Copyright (c) 2025, Igor Belwon <igor.belwon@mentallysanemainliners.org>
  *
+<<<<<<< HEAD
  * Based on Linux driver
+=======
+ * Loosely based on Linux driver: drivers/ufs/host/ufs-mediatek.c
+>>>>>>> denx/master
  */
 
 #include <asm/io.h>
@@ -24,12 +28,15 @@
 #include "ufs-mediatek.h"
 #include "ufs-mediatek-sip.h"
 
+<<<<<<< HEAD
 #define UFSHCD_MAX_Q_NR 8
 
 /**
  * ufs_mtk_advertise_quirks - advertise the known MediaTek UFS controller quirks
  * @hba: host controller instance
  */
+=======
+>>>>>>> denx/master
 static void ufs_mtk_advertise_quirks(struct ufs_hba *hba)
 {
 	hba->quirks |= UFSHCI_QUIRK_SKIP_MANUAL_WB_FLUSH_CTRL |
@@ -62,6 +69,7 @@ static int ufs_mtk_hce_enable_notify(struct ufs_hba *hba,
 			ufshcd_rmwl(hba, UFS_MASK(0x7FFF, 8),
 				    0x453000, REG_UFS_MMIO_OPT_CTRL_0);
 		}
+<<<<<<< HEAD
 
 	}
 	// TODO should be void
@@ -69,6 +77,13 @@ static int ufs_mtk_hce_enable_notify(struct ufs_hba *hba,
 }
 
 
+=======
+	}
+
+	return 0;
+}
+
+>>>>>>> denx/master
 static int ufs_mtk_unipro_set_lpm(struct ufs_hba *hba, bool lpm)
 {
 	int ret;
@@ -89,6 +104,7 @@ static int ufs_mtk_unipro_set_lpm(struct ufs_hba *hba, bool lpm)
 	return ret;
 }
 
+<<<<<<< HEAD
 void mtk_ufs_bootloader_smc_reset(void)
 {
 	struct arm_smccc_res smccc_res;
@@ -105,11 +121,14 @@ void mtk_ufs_bootloader_smc_reset(void)
 				  1, 0, 0, 0, 0, 0, &smccc_res);
 }
 
+=======
+>>>>>>> denx/master
 static int ufs_mtk_pre_link(struct ufs_hba *hba)
 {
 	int ret;
 	u32 tmp;
 
+<<<<<<< HEAD
 	/*
 	 * As we are the primary bootloader, and the first thing
 	 * to run in non-secure world, we need to reset the UFS
@@ -117,6 +136,8 @@ static int ufs_mtk_pre_link(struct ufs_hba *hba)
 	 */
 	mtk_ufs_bootloader_smc_reset();
 
+=======
+>>>>>>> denx/master
 	ret = ufs_mtk_unipro_set_lpm(hba, false);
 	if (ret)
 		return ret;
@@ -141,7 +162,11 @@ static int ufs_mtk_pre_link(struct ufs_hba *hba)
 	if (ret)
 		return ret;
 
+<<<<<<< HEAD
 	ret = ufshcd_dme_set(hba, UIC_ARG_MIB(0x1585), tmp);
+=======
+	ret = ufshcd_dme_set(hba, UIC_ARG_MIB(PA_SCRAMBLING), tmp);
+>>>>>>> denx/master
 
 	return ret;
 }
@@ -154,9 +179,15 @@ static void ufs_mtk_cfg_unipro_cg(struct ufs_hba *hba, bool enable)
 		ufshcd_dme_get(hba,
 			       UIC_ARG_MIB(VS_SAVEPOWERCONTROL), &tmp);
 		tmp = tmp |
+<<<<<<< HEAD
 		(1 << RX_SYMBOL_CLK_GATE_EN) |
 		(1 << SYS_CLK_GATE_EN) |
 		(1 << TX_CLK_GATE_EN);
+=======
+		      (1 << RX_SYMBOL_CLK_GATE_EN) |
+		      (1 << SYS_CLK_GATE_EN) |
+		      (1 << TX_CLK_GATE_EN);
+>>>>>>> denx/master
 		ufshcd_dme_set(hba,
 			       UIC_ARG_MIB(VS_SAVEPOWERCONTROL), tmp);
 
@@ -169,8 +200,13 @@ static void ufs_mtk_cfg_unipro_cg(struct ufs_hba *hba, bool enable)
 		ufshcd_dme_get(hba,
 			       UIC_ARG_MIB(VS_SAVEPOWERCONTROL), &tmp);
 		tmp = tmp & ~((1 << RX_SYMBOL_CLK_GATE_EN) |
+<<<<<<< HEAD
 		(1 << SYS_CLK_GATE_EN) |
 		(1 << TX_CLK_GATE_EN));
+=======
+			     (1 << SYS_CLK_GATE_EN) |
+			     (1 << TX_CLK_GATE_EN));
+>>>>>>> denx/master
 		ufshcd_dme_set(hba,
 			       UIC_ARG_MIB(VS_SAVEPOWERCONTROL), tmp);
 
@@ -194,6 +230,7 @@ static int ufs_mtk_link_startup_notify(struct ufs_hba *hba,
 	int ret = 0;
 
 	switch (status) {
+<<<<<<< HEAD
 		case PRE_CHANGE:
 			dev_dbg(hba->dev, "UFS status changed to PRE_CHANGE! %i\n", status);
 			ret = ufs_mtk_pre_link(hba);
@@ -203,6 +240,15 @@ static int ufs_mtk_link_startup_notify(struct ufs_hba *hba,
 			ufs_mtk_post_link(hba);
 			break;
 		default:
+=======
+	case PRE_CHANGE:
+			ret = ufs_mtk_pre_link(hba);
+			break;
+	case POST_CHANGE:
+			ufs_mtk_post_link(hba);
+			break;
+	default:
+>>>>>>> denx/master
 			ret = -EINVAL;
 			break;
 	}
@@ -210,6 +256,7 @@ static int ufs_mtk_link_startup_notify(struct ufs_hba *hba,
 	return ret;
 }
 
+<<<<<<< HEAD
 //static int ufs_mtk_bind_mphy(struct ufs_hba *hba)
 //{
 //	struct ufs_mtk_host *host = dev_get_priv(hba->dev);
@@ -230,6 +277,24 @@ static int ufs_mtk_link_startup_notify(struct ufs_hba *hba,
 //
 //	return err;
 //}
+=======
+static int ufs_mtk_bind_mphy(struct ufs_hba *hba)
+{
+	struct ufs_mtk_host *host = dev_get_priv(hba->dev);
+	int err = 0;
+
+	err = generic_phy_get_by_index(hba->dev, 0, &host->mphy);
+
+	if (err) {
+		if (err == -ENOENT)
+			return 0; /* no PHY, nothing to do */
+		dev_err(hba->dev, "Failed to get PHY: %d.\n", err);
+		return err;
+	}
+
+	return err;
+}
+>>>>>>> denx/master
 
 static void ufs_mtk_init_reset_control(struct ufs_hba *hba,
 				       struct reset_ctl **rc,
@@ -320,7 +385,11 @@ static int ufs_mtk_setup_ref_clk(struct ufs_hba *hba, bool on)
 
 	return -ETIMEDOUT;
 
+<<<<<<< HEAD
 	out:
+=======
+out:
+>>>>>>> denx/master
 	host->ref_clk_enabled = on;
 	if (on)
 		udelay(10);
@@ -336,7 +405,11 @@ static int ufs_mtk_setup_ref_clk(struct ufs_hba *hba, bool on)
  *
  * Powers up PHY enabling clocks and regulators.
  *
+<<<<<<< HEAD
  * Returns -EPROBE_DEFER if binding fails, returns negative error
+=======
+ * Returns -ENODEV if binding fails, returns negative error
+>>>>>>> denx/master
  * on phy power up failure and returns zero on success.
  */
 static int ufs_mtk_init(struct ufs_hba *hba)
@@ -346,14 +419,21 @@ static int ufs_mtk_init(struct ufs_hba *hba)
 
 	priv->hba = hba;
 
+<<<<<<< HEAD
 //	err = ufs_mtk_bind_mphy(hba);
 //	if (err)
 //	return -ENODEV;
+=======
+	err = ufs_mtk_bind_mphy(hba);
+	if (err)
+		return -ENODEV;
+>>>>>>> denx/master
 
 	ufs_mtk_advertise_quirks(hba);
 
 	ufs_mtk_init_reset(hba);
 
+<<<<<<< HEAD
 	// TODO: Clocks :)
 
 //	err = generic_phy_power_on(priv->mphy);
@@ -362,11 +442,40 @@ static int ufs_mtk_init(struct ufs_hba *hba)
 //			__func__, err);
 //		return err;
 //	}
+=======
+	err = clk_get_bulk(hba->dev, &priv->clks);
+	if (err) {
+		dev_err(hba->dev, "failed to initialize clocks, err:%d\n", err);
+		return err;
+	}
+
+	err = clk_enable_bulk(&priv->clks);
+	if (err) {
+		dev_err(hba->dev, "failed to enable clocks, err:%d\n", err);
+		goto err_clk_enable;
+	}
+
+	err = generic_phy_power_on(&priv->mphy);
+	if (err) {
+		dev_err(hba->dev, "%s: phy init failed, err = %d\n",
+			__func__, err);
+		goto err_phy_power_on;
+	}
+>>>>>>> denx/master
 
 	ufs_mtk_setup_ref_clk(hba, true);
 	ufs_mtk_get_hw_ip_version(hba);
 
 	return 0;
+<<<<<<< HEAD
+=======
+
+err_phy_power_on:
+	clk_disable_bulk(&priv->clks);
+err_clk_enable:
+	clk_release_bulk(&priv->clks);
+	return err;
+>>>>>>> denx/master
 }
 
 static int ufs_mtk_device_reset(struct ufs_hba *hba)
@@ -387,9 +496,15 @@ static int ufs_mtk_device_reset(struct ufs_hba *hba)
 	ufs_mtk_device_reset_ctrl(1, res);
 
 	/* Some devices may need time to respond to rst_n */
+<<<<<<< HEAD
 	udelay(15000);
 
 	dev_info(hba->dev, "device reset done\n");
+=======
+	mdelay(13);
+
+	dev_dbg(hba->dev, "device reset done\n");
+>>>>>>> denx/master
 
 	return 0;
 }
@@ -414,6 +529,7 @@ static int ufs_mtk_probe(struct udevice *dev)
 	return 0;
 }
 
+<<<<<<< HEAD
 static int ufs_mtk_bind(struct udevice *dev)
 {
 	struct udevice *scsi_dev;
@@ -426,6 +542,13 @@ static const struct udevice_id ufs_mtk_ids[] = {
 	{ .compatible = "mediatek,mt6878-ufshci" },
 	{ .compatible = "mediatek,mt8183-ufshci" },
 	{},
+=======
+static const struct udevice_id ufs_mtk_ids[] = {
+	{ .compatible = "mediatek,mt6878-ufshci" },
+	{ .compatible = "mediatek,mt8183-ufshci" },
+	{ .compatible = "mediatek,mt8195-ufshci" },
+	{ }
+>>>>>>> denx/master
 };
 
 U_BOOT_DRIVER(mediatek_ufshci) = {
@@ -433,6 +556,9 @@ U_BOOT_DRIVER(mediatek_ufshci) = {
 	.id		= UCLASS_UFS,
 	.of_match	= ufs_mtk_ids,
 	.probe		= ufs_mtk_probe,
+<<<<<<< HEAD
 	.bind		= ufs_mtk_bind,
+=======
+>>>>>>> denx/master
 	.priv_auto	= sizeof(struct ufs_mtk_host),
 };

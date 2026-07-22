@@ -1,8 +1,8 @@
 config MSM8916_USB_PHY
-	bool "Qualcomm MSM8916 USB PHY support"
-	depends on PHY
+	bool
+	select PHY
 	help
-          Support the USB PHY in msm8916
+          Support the Qualcomm MSM8916 USB PHY
 
 	  This PHY is found on qualcomm dragonboard410c development board.
 
@@ -11,6 +11,14 @@ config PHY_QCOM_IPQ4019_USB
 	depends on PHY && ARCH_IPQ40XX
 	help
 	  Support for the USB PHY-s on Qualcomm IPQ40xx SoC-s.
+
+config PHY_QCOM_QMP_COMBO
+	bool "Qualcomm QMP USB3-DP Combo PHY driver"
+	depends on PHY && ARCH_SNAPDRAGON
+	help
+	  Enable this to support the USB3-DP Combo QMP PHY on various Qualcomm
+	  chipsets. This driver supports the USB3 PHY functionality of the combo
+	  PHY (USB3 + DisplayPort). Currently only USB3 mode is supported.
 
 config PHY_QCOM_QMP_PCIE
 	tristate "Qualcomm QMP PCIe PHY driver"

@@ -15,9 +15,10 @@
 #include <asm/arch/k3-ddr.h>
 
 #include "../common/fdt_ops.h"
+#include "../common/k3_32k_lfosc.h"
 
 #if defined(CONFIG_XPL_BUILD)
-void spl_perform_fixups(struct spl_image_info *spl_image)
+void spl_perform_board_fixups(struct spl_image_info *spl_image)
 {
 	if (IS_ENABLED(CONFIG_K3_DDRSS)) {
 		if (IS_ENABLED(CONFIG_K3_INLINE_ECC))
@@ -25,6 +26,12 @@ void spl_perform_fixups(struct spl_image_info *spl_image)
 	} else {
 		fixup_memory_node(spl_image);
 	}
+}
+
+void spl_board_init(void)
+{
+	if (IS_ENABLED(CONFIG_TI_K3_BOARD_LFOSC))
+		enable_32k_lfosc();
 }
 #endif
 

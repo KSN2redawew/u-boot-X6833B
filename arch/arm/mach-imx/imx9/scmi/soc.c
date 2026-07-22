@@ -17,8 +17,11 @@
 #include <env_internal.h>
 #include <fuse.h>
 #include <imx_thermal.h>
+#include <linux/bitfield.h>
 #include <linux/iopoll.h>
 #include <scmi_agent.h>
+#include <scmi_nxp_protocols.h>
+#include "common.h"
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -49,6 +52,34 @@ uint32_t scmi_get_rom_data(rom_passover_t *rom_data)
 	} else {
 		printf("Failed to get ROM passover data, scmi_err = %d, size_of(out) = %ld\n",
 		       out.status, sizeof(out));
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+int scmi_misc_ddrinfo(u32 ddrc_id, struct scmi_ddr_info_out *out)
+{
+	u32 in = ddrc_id;
+	struct scmi_msg msg = {
+		.protocol_id = SCMI_PROTOCOL_ID_IMX_MISC,
+		.message_id = SCMI_MISC_DDR_INFO_GET,
+		.in_msg = (u8 *)&in,
+		.in_msg_sz = sizeof(in),
+		.out_msg = (u8 *)out,
+		.out_msg_sz = sizeof(*out),
+	};
+	int ret;
+	struct udevice *dev;
+
+	ret = uclass_get_device_by_name(UCLASS_CLK, "protocol@14", &dev);
+	if (ret)
+		return ret;
+
+	ret = devm_scmi_process_msg(dev, &msg);
+	if (ret != 0 || out->status != 0) {
+		printf("Failed to get ddr cfg, scmi_err = %d\n",
+		       out->status);
 		return -EINVAL;
 	}
 
@@ -122,6 +153,8 @@ u32 get_cpu_speed_grade_hz(void)
 
 	if (is_imx95())
 		max_speed = 2000000000;
+	if (is_imx952())
+		max_speed = 1700000000;
 
 	/* In case the fuse of speed grade not programmed */
 	if (speed > max_speed)
@@ -174,7 +207,7 @@ u32 get_cpu_rev(void)
 {
 	u32 rev = (gd->arch.soc_rev >> 24) - 0xa0;
 
-	return (MXC_CPU_IMX95 << 12) | (CHIP_REV_1_0 + rev);
+	return (SCMI_CPU << 12) | (CHIP_REV_1_0 + rev);
 }
 
 #define UNLOCK_WORD 0xD928C520
@@ -254,6 +287,30 @@ static struct mm_region imx9_mem_map[] = {
 			 PTE_BLOCK_OUTER_SHARE
 	}, {
 #endif
+		/* PCIE2 ECAM */
+		.virt = 0x880000000UL,
+		.phys = 0x880000000UL,
+		.size = 0x10000000UL,
+		.attrs = PTE_BLOCK_MEMTYPE(MT_DEVICE_NGNRNE) |
+			 PTE_BLOCK_NON_SHARE |
+			 PTE_BLOCK_PXN | PTE_BLOCK_UXN
+	}, {
+		/* PCIE1 Outbound */
+		.virt = 0x900000000UL,
+		.phys = 0x900000000UL,
+		.size = 0x100000000UL,
+		.attrs = PTE_BLOCK_MEMTYPE(MT_DEVICE_NGNRNE) |
+			 PTE_BLOCK_NON_SHARE |
+			 PTE_BLOCK_PXN | PTE_BLOCK_UXN
+	}, {
+		/* PCIE2 Outbound */
+		.virt = 0xA00000000UL,
+		.phys = 0xA00000000UL,
+		.size = 0x100000000UL,
+		.attrs = PTE_BLOCK_MEMTYPE(MT_DEVICE_NGNRNE) |
+			 PTE_BLOCK_NON_SHARE |
+			 PTE_BLOCK_PXN | PTE_BLOCK_UXN
+	}, {
 		/* empty entry to split table entry 5 if needed when TEEs are used */
 		0,
 	}, {
@@ -308,25 +365,44 @@ void enable_caches(void)
 
 __weak int board_phys_sdram_size(phys_size_t *size)
 {
+	struct scmi_ddr_info_out ddr_info = {0};
+	int ret;
+	u32 ddrc_id = 0, ddrc_num = 1;
 	phys_size_t start, end;
-	phys_size_t val;
 
 	if (!size)
 		return -EINVAL;
 
-	val = readl(REG_DDR_CS0_BNDS);
-	start = (val >> 16) << 24;
-	end   = (val & 0xFFFF);
-	end   = end ? end + 1 : 0;
-	end   = end << 24;
-	*size = end - start;
+	*size = 0;
+	do {
+		ret = scmi_misc_ddrinfo(ddrc_id++, &ddr_info);
+		if (ret) {
+			/* if get DDR info failed, fall to default config */
+			*size = PHYS_SDRAM_SIZE;
+#ifdef PHYS_SDRAM_2_SIZE
+			*size += PHYS_SDRAM_2_SIZE;
+#endif
+			return 0;
+		} else {
+			ddrc_num = ((ddr_info.attributes >> 16) & 0x3);
+			start = ddr_info.starthigh;
+			start <<= 32;
+			start += ddr_info.startlow;
 
-	val = readl(REG_DDR_CS1_BNDS);
-	start = (val >> 16) << 24;
-	end   = (val & 0xFFFF);
-	end   = end ? end + 1 : 0;
-	end   = end << 24;
-	*size += end - start;
+			end = ddr_info.endhigh;
+			end <<= 32;
+			end += ddr_info.endlow;
+
+			*size += end + 1 - start;
+
+			debug("ddr info attr 0x%x, start 0x%x 0x%x, end 0x%x 0x%x, mts %u\n",
+			      ddr_info.attributes, ddr_info.starthigh, ddr_info.startlow,
+			      ddr_info.endhigh, ddr_info.endlow, ddr_info.mts);
+		}
+	} while (ddrc_id < ddrc_num);
+
+	/* SM reports total DDR size, need remove secure memory */
+	*size -= PHYS_SDRAM - 0x80000000;
 
 	return 0;
 }
@@ -431,16 +507,49 @@ phys_size_t get_effective_memsize(void)
 	}
 }
 
+static inline u64 ether_addr_to_u64(const u8 *addr)
+{
+	u64 u = 0;
+	int i;
+
+	for (i = 0; i < 6; i++)
+		u = u << 8 | addr[i];
+
+	return u;
+}
+
+static inline void u64_to_ether_addr(u64 u, u8 *addr)
+{
+	int i;
+
+	for (i = 6 - 1; i >= 0; i--) {
+		addr[i] = u & 0xff;
+		u = u >> 8;
+	}
+}
+
+static inline void eth_addr_add(u8 *addr, long offset)
+{
+	u64 u = ether_addr_to_u64(addr);
+
+	u += offset;
+	u64_to_ether_addr(u, addr);
+}
+
 void imx_get_mac_from_fuse(int dev_id, unsigned char *mac)
 {
 	u32 val[2] = {};
 	int ret, num_of_macs;
+	u32 bank = 40;
 
-	ret = fuse_read(40, 5, &val[0]);
+	if (is_imx94())
+		bank = 66;
+
+	ret = fuse_read(bank, 5, &val[0]);
 	if (ret)
 		goto err;
 
-	ret = fuse_read(40, 6, &val[1]);
+	ret = fuse_read(bank, 6, &val[1]);
 	if (ret)
 		goto err;
 
@@ -456,10 +565,32 @@ void imx_get_mac_from_fuse(int dev_id, unsigned char *mac)
 	mac[3] = (val[0] >> 24) & 0xff;
 	mac[4] = val[1] & 0xff;
 	mac[5] = (val[1] >> 8) & 0xff;
-	if (dev_id == 1)
-		mac[5] = mac[5] + 3;
-	if (dev_id == 2)
-		mac[5] = mac[5] + 6;
+
+	if (is_imx94()) {
+		/*
+		 * i.MX94 uses the following mac address offset list:
+		 * | No.    | Module      | Mac address user          |
+		 * |--------|-------------|---------------------------|
+		 * | 0 ~ 1  | ethercat    | port0/port1               |
+		 * | 2      | netc switch | internal enetc3 mac/swp0  |
+		 * | 3 ~ 6  |             | enetc3 vf1~3/swp1         |
+		 * | 7      | enetc mac   | enetc0 pf                 |
+		 * | 8      |             | enetc1 pf                 |
+		 * | 9      |             | enetc2 pf                 |
+		 * | 10     | netc switch | swp2                      |
+		 */
+		if (dev_id == 0)
+			eth_addr_add(mac, 2); /* enetc3 mac/swp0 */
+		if (dev_id == 1)
+			eth_addr_add(mac, 8); /* enetc1 */
+		if (dev_id == 2)
+			eth_addr_add(mac, 9); /* enetc2 */
+	} else {
+		if (dev_id == 1)
+			eth_addr_add(mac, 3);
+		if (dev_id == 2)
+			eth_addr_add(mac, 6);
+	}
 
 	debug("%s: MAC%d: %pM\n", __func__, dev_id, mac);
 	return;
@@ -468,11 +599,149 @@ err:
 	printf("%s: fuse read err: %d\n", __func__, ret);
 }
 
+static char *rst_string[32] = {
+	"cm33_lockup",
+	"cm33_swreq",
+	"cm7_lockup",
+	"cm7_swreq",
+	"fccu",
+	"jtag_sw",
+	"ele",
+	"tempsense",
+	"wdog1",
+	"wdog2",
+	"wdog3",
+	"wdog4",
+	"wdog5",
+	"jtag",
+	"cm33_exc",
+	"bbm",
+	"sw",
+	"sm_err", "fusa_sreco", "pmic", "unused", "unused", "unused",
+	"unused", "unused", "unused", "unused", "unused", "unused",
+	"unused", "unused",
+	"por"
+};
+
+static char *rst_string_imx94[32] = {
+	"cm33_lockup",
+	"cm33_swreq",
+	"cm70_lockup",
+	"cm70_swreq",
+	"fccu",
+	"jtag_sw",
+	"ele",
+	"tempsense",
+	"wdog1",
+	"wdog2",
+	"wdog3",
+	"wdog4",
+	"wdog5",
+	"jtag",
+	"wdog6",
+	"wdog7",
+	"wdog8",
+	"wo_netc", "cm33s_lockup", "cm33s_swreq", "cm71_lockup", "cm71_swreq", "cm33_exc",
+	"bbm", "sw", "sm_err", "fusa_sreco", "pmic", "unused",
+	"unused", "unused",
+	"por"
+};
+
+int get_reset_reason(bool sys, bool lm)
+{
+	struct scmi_imx_misc_reset_reason_in in = {
+		.flags = MISC_REASON_FLAG_SYSTEM,
+	};
+
+	struct scmi_imx_misc_reset_reason_out out = { 0 };
+	struct scmi_msg msg = {
+		.protocol_id = SCMI_PROTOCOL_ID_IMX_MISC,
+		.message_id = SCMI_IMX_MISC_RESET_REASON,
+		.in_msg = (u8 *)&in,
+		.in_msg_sz = sizeof(in),
+		.out_msg = (u8 *)&out,
+		.out_msg_sz = sizeof(out),
+	};
+	int ret;
+
+	struct udevice *dev;
+	char **rst;
+
+	if (is_imx94())
+		rst = rst_string_imx94;
+	else
+		rst = rst_string;
+
+	ret = uclass_get_device_by_name(UCLASS_CLK, "protocol@14", &dev);
+	if (ret)
+		return ret;
+
+	if (sys) {
+		ret = devm_scmi_process_msg(dev, &msg);
+		if (out.status) {
+			printf("%s:%d for SYS\n", __func__, out.status);
+			return ret;
+		}
+
+		if (out.bootflags & MISC_BOOT_FLAG_VLD) {
+			printf("SYS Boot reason: %s, origin: %ld, errid: %ld\n",
+			       rst[out.bootflags & MISC_BOOT_FLAG_REASON],
+			       out.bootflags & MISC_BOOT_FLAG_ORG_VLD ?
+			       FIELD_GET(MISC_BOOT_FLAG_ORIGIN, out.bootflags) : -1,
+			       out.bootflags & MISC_BOOT_FLAG_ERR_VLD ?
+			       FIELD_GET(MISC_BOOT_FLAG_ERR_ID, out.bootflags) : -1
+			       );
+		}
+		if (out.shutdownflags & MISC_SHUTDOWN_FLAG_VLD) {
+			printf("SYS shutdown reason: %s, origin: %ld, errid: %ld\n",
+			       rst[out.shutdownflags & MISC_SHUTDOWN_FLAG_REASON],
+			       out.shutdownflags & MISC_SHUTDOWN_FLAG_ORG_VLD ?
+			       FIELD_GET(MISC_SHUTDOWN_FLAG_ORIGIN, out.shutdownflags) : -1,
+			       out.shutdownflags & MISC_SHUTDOWN_FLAG_ERR_VLD ?
+			       FIELD_GET(MISC_SHUTDOWN_FLAG_ERR_ID, out.shutdownflags) : -1
+			       );
+		}
+	}
+
+	if (lm) {
+		in.flags = 0;
+		memset(&out, 0, sizeof(struct scmi_imx_misc_reset_reason_out));
+
+		ret = devm_scmi_process_msg(dev, &msg);
+		if (out.status) {
+			printf("%s:%d for LM\n", __func__, out.status);
+			return ret;
+		}
+
+		if (out.bootflags & MISC_BOOT_FLAG_VLD) {
+			printf("LM Boot reason: %s, origin: %ld, errid: %ld\n",
+			       rst[out.bootflags & MISC_BOOT_FLAG_REASON],
+			       out.bootflags & MISC_BOOT_FLAG_ORG_VLD ?
+			       FIELD_GET(MISC_BOOT_FLAG_ORIGIN, out.bootflags) : -1,
+			       out.bootflags & MISC_BOOT_FLAG_ERR_VLD ?
+			       FIELD_GET(MISC_BOOT_FLAG_ERR_ID, out.bootflags) : -1
+			       );
+		}
+
+		if (out.shutdownflags & MISC_SHUTDOWN_FLAG_VLD) {
+			printf("LM shutdown reason: %s, origin: %ld, errid: %ld\n",
+			       rst[out.shutdownflags & MISC_SHUTDOWN_FLAG_REASON],
+			       out.shutdownflags & MISC_SHUTDOWN_FLAG_ORG_VLD ?
+			       FIELD_GET(MISC_SHUTDOWN_FLAG_ORIGIN, out.shutdownflags) : -1,
+			       out.shutdownflags & MISC_SHUTDOWN_FLAG_ERR_VLD ?
+			       FIELD_GET(MISC_SHUTDOWN_FLAG_ERR_ID, out.shutdownflags) : -1
+			       );
+		}
+	}
+
+	return 0;
+}
+
 const char *get_imx_type(u32 imxtype)
 {
 	switch (imxtype) {
-	case MXC_CPU_IMX95:
-		return "95";/* iMX95 FULL */
+	case SCMI_CPU:
+		return IMX_PLAT_STR;
 	default:
 		return "??";
 	}
@@ -546,13 +815,19 @@ static void gpio_reset(ulong gpio_base)
 int arch_cpu_init(void)
 {
 	if (IS_ENABLED(CONFIG_SPL_BUILD)) {
-		disable_wdog((void __iomem *)WDG3_BASE_ADDR);
-		disable_wdog((void __iomem *)WDG4_BASE_ADDR);
+		if (!IS_ENABLED(CONFIG_IMX952)) {
+			disable_wdog((void __iomem *)WDG3_BASE_ADDR);
+			disable_wdog((void __iomem *)WDG4_BASE_ADDR);
+		}
 
 		gpio_reset(GPIO2_BASE_ADDR);
 		gpio_reset(GPIO3_BASE_ADDR);
 		gpio_reset(GPIO4_BASE_ADDR);
 		gpio_reset(GPIO5_BASE_ADDR);
+#ifdef CONFIG_IMX94
+		gpio_reset(GPIO6_BASE_ADDR);
+		gpio_reset(GPIO7_BASE_ADDR);
+#endif
 	}
 
 	return 0;
@@ -625,7 +900,7 @@ int timer_init(void)
 	return 0;
 }
 
-enum env_location env_get_location(enum env_operation op, int prio)
+enum env_location arch_env_get_location(enum env_operation op, int prio)
 {
 	enum boot_device dev = get_boot_device();
 	enum env_location env_loc = ENVL_UNKNOWN;
@@ -726,7 +1001,7 @@ enum boot_device get_boot_device(void)
 		break;
 	case BT_DEV_TYPE_USB:
 		boot_dev = boot_instance + USB_BOOT;
-		if (IS_ENABLED(CONFIG_IMX95))
+		if (is_imx95() && (soc_rev() < CHIP_REV_2_0))
 			boot_dev -= 3; //iMX95 usb instance start at 3
 		break;
 	default:
@@ -739,10 +1014,11 @@ enum boot_device get_boot_device(void)
 
 bool arch_check_dst_in_secure(void *start, ulong size)
 {
-	ulong ns_end = CFG_SYS_SDRAM_BASE + PHYS_SDRAM_SIZE;
-#ifdef PHYS_SDRAM_2_SIZE
-	ns_end += PHYS_SDRAM_2_SIZE;
-#endif
+	ulong ns_end;
+	phys_size_t dram_size;
+
+	board_phys_sdram_size(&dram_size);
+	ns_end = CFG_SYS_SDRAM_BASE + dram_size;
 
 	if ((ulong)start < CFG_SYS_SDRAM_BASE || (ulong)start + size > ns_end)
 		return true;
@@ -752,5 +1028,10 @@ bool arch_check_dst_in_secure(void *start, ulong size)
 
 void *arch_get_container_trampoline(void)
 {
-	return (void *)((ulong)CFG_SYS_SDRAM_BASE + PHYS_SDRAM_SIZE - SZ_16M);
+	phys_size_t size;
+
+	board_phys_sdram_size(&size);
+	size = (size > PHYS_SDRAM_SIZE) ? PHYS_SDRAM_SIZE : size;
+
+	return (void *)((ulong)CFG_SYS_SDRAM_BASE + size - SZ_16M);
 }

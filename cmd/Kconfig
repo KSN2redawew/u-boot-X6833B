@@ -47,6 +47,14 @@ config HUSH_SELECTABLE
 	default y if HUSH_OLD_PARSER && HUSH_MODERN_PARSER
 endmenu
 
+config CMDLINE_FLUSH_STDIN
+	bool "Enable flushing input before starting cli"
+	help
+	  When this option is enabled the stdin buffer will be flushed before
+	  starting the CLI. This is useful when stdin is changed during boot
+	  (e.g. from nulldev to serial) and junk characters may be pending
+	  in the buffer.
+
 config CMDLINE_EDITING
 	bool "Enable command line editing"
 	default y
@@ -223,6 +231,7 @@ config CMD_LICENSE
 
 config CMD_PMC
 	bool "pmc"
+	depends on ACPI_PMC
 	help
 	  Provides access to the Intel Power-Management Controller (PMC) so
 	  that its state can be examined. This does not currently support
@@ -264,6 +273,21 @@ config CMD_SBI
 	help
 	  Display information about the SBI implementation.
 
+config CMD_SM3SUM
+	bool "sm3sum"
+	select SM3
+	select HASH
+	help
+	  Compute SM3 checksum.
+	  add SM3 hash functionality
+
+config SM3SUM_VERIFY
+	bool "sm3sum -v"
+	depends on CMD_SM3SUM
+	help
+	  Add for the sm3sum command the -v option
+	  to verify data against an SM3 checksum.
+
 config CMD_SMBIOS
 	bool "smbios"
 	depends on SMBIOS
@@ -276,6 +300,7 @@ menu "Boot commands"
 
 config CMD_BOOTD
 	bool "bootd"
+	depends on CMD_BOOTM
 	default y
 	help
 	  Run the command stored in the environment "bootcmd", i.e.
@@ -283,7 +308,9 @@ config CMD_BOOTD
 
 config CMD_BOOTM
 	bool "bootm"
+	depends on LMB
 	default y
+	select LIB_BOOTM
 	help
 	  Boot an application image from the memory.
 
@@ -360,13 +387,19 @@ config BOOTM_ELF
 
 config CMD_BOOTZ
 	bool "bootz"
+	depends on LMB
+	select LIB_BOOTZ
+	select LIB_BOOTM
 	help
 	  Boot the Linux zImage
 
 config CMD_BOOTI
 	bool "booti"
 	depends on ARM64 || RISCV || SANDBOX
+	depends on LMB
 	default y
+	select LIB_BOOTI
+	select LIB_BOOTM
 	help
 	  Boot an AArch64 Linux Kernel image from memory.
 
@@ -379,11 +412,11 @@ config BOOTM_LINUX
 	  or booti or bootz.
 
 config BOOTM_NETBSD
-	bool "Support booting NetBSD (non-EFI) loader images"
+	bool "Support booting NetBSD (legacy, non-EFI) loader images"
 	depends on CMD_BOOTM
-	default y
 	help
-	  Support booting NetBSD via the bootm command.
+	  Support booting NetBSD via the bootm command. This is for NetBSD
+	  images that are neither EFI nor using a device tree.
 
 config BOOTM_OPENRTOS
 	bool "Support booting OPENRTOS / FreeRTOS images"
@@ -545,9 +578,6 @@ config CMD_FDT
 	help
 	  Do FDT related setup before booting into the Operating System.
 
-config SUPPORT_EXTENSION_SCAN
-	bool
-
 config CMD_EXTENSION
 	bool "Extension board management command"
 	select CMD_FDT
@@ -603,7 +633,7 @@ config CMD_SPL
 	help
 	  Falcon mode allows booting directly from SPL into an Operating
 	  System such as Linux, thus skipping U-Boot proper. See
-	  doc/README.falcon for full information about how to use this
+	  doc/develop/falcon.rst for full information about how to use this
 	  command.
 
 config CMD_SPL_NAND_OFS
@@ -612,7 +642,7 @@ config CMD_SPL_NAND_OFS
 	default 0x0
 	help
 	  This provides the offset of the command line arguments for Linux
-	  when booting from NAND in Falcon mode.  See doc/README.falcon
+	  when booting from NAND in Falcon mode.  See doc/develop/falcon.rst
 	  for full information about how to use this option (and also see
 	  board/gateworks/gw_ventana/README for an example).
 
@@ -696,6 +726,7 @@ config CMD_GREPENV
 
 config CMD_SAVEENV
 	bool "saveenv"
+	depends on !(SRIO_PCIE_BOOT_SLAVE && ENV_IS_IN_REMOTE)
 	default y
 	help
 	  Save all environment variables into the compiled-in persistent
@@ -922,6 +953,14 @@ config CMD_MEMINFO_MAP
 	  detail about each piece of it.
 
 	  See doc/usage/cmd/meminfo.rst for more information.
+
+config CMD_MEMSIZE
+	bool "memsize"
+	default y if SANDBOX
+	depends on CMD_MEMINFO
+	help
+	  Get RAM via command for use in scripts. Print or assign decimal value
+	  in MiB to environment variable.
 
 config CMD_MEMORY
 	bool "md, mm, nm, mw, cp, cmp, base, loop"
@@ -1238,6 +1277,7 @@ config CMD_FPGAD
 
 config CMD_FUSE
 	bool "fuse - support for the fuse subssystem"
+	depends on !COMPILE_TEST
 	help
 	  (deprecated - needs conversion to driver model)
 	  This allows reading, sensing, programming or overriding fuses
@@ -1289,6 +1329,7 @@ config CMD_GPT_RENAME
 
 config CMD_IDE
 	bool "ide - Support for IDE drivers"
+	depends on !COMPILE_TEST
 	select IDE
 	help
 	  Provides an 'ide' command which allows accessing the IDE drive,
@@ -1306,11 +1347,22 @@ config CMD_IO
 
 config CMD_IOTRACE
 	bool "iotrace - Support for tracing I/O activity"
+	depends on IO_TRACE
 	help
 	  Provides an 'iotrace' command which supports recording I/O reads and
 	  writes in a trace buffer in memory . It also maintains a checksum
 	  of the trace records (even if space is exhausted) so that the
 	  sequence of I/O accesses can be verified.
+
+	  Example output from the 'iotrace stats' command is below.
+
+		iotrace is enabled
+		Start:  10000000	(buffer start address)
+		Size:   00010000	(buffer size)
+		Offset: 00000120	(current buffer offset)
+		Output: 10000120	(start + offset)
+		Count:  00000018	(number of trace records)
+		CRC32:  9526fb66	(CRC32 of all trace records)
 
 	  When debugging drivers it is useful to see what I/O accesses were
 	  done and in what order.
@@ -1351,7 +1403,7 @@ config CMD_I3C
 	  and perform read and write on the connected i3c devices.
 
 config CMD_W1
-	depends on W1
+	depends on W1 && W1_EEPROM
 	default y if W1
 	bool "w1 - Support for Dallas 1-Wire protocol"
 	help
@@ -1370,6 +1422,7 @@ config CMD_LOADM
 
 config CMD_LOADS
 	bool "loads - Load a file over serial in S-Record format"
+	depends on LMB
 	default y
 	help
 	  Load an S-Record file over serial line
@@ -1511,6 +1564,44 @@ config CMD_MTD_OTP
 	help
 	  MTD commands for OTP access.
 
+config CMD_MTD_MARKBAD
+	bool "mtd markbad"
+	depends on CMD_MTD
+	help
+	  MTD markbad command support.
+
+	  This is a clone of "nand markbad" command, but for 'mtd' subsystem.
+
+config CMD_MTD_NAND_WRITE_TEST
+	bool "mtd nand_write_test (destructive)"
+	depends on CMD_MTD
+	help
+	  MTD nand_write_test command support.
+
+	  Writes blocks of NAND flash with different patterns.
+	  This is useful to determine if a block that caused a write error
+	  is still good or should be marked as bad.
+
+	  This is a clone of "nand torture" command, but for 'mtd' subsystem.
+
+	  WARNING: This test will destroy any data on blocks being tested.
+
+config CMD_MTD_NAND_READ_TEST
+	bool "mtd nand_read_test"
+	depends on CMD_MTD
+	help
+	  MTD nand_read_test command support.
+
+	  Reads blocks of NAND flash in normal and raw modes and compares results.
+	  The following statuses can be returned for a block:
+	    * non-ecc reading failed,
+	    * ecc reading failed,
+	    * block is bad,
+	    * bitflips is above maximum,
+	    * actual number of biflips above reported one,
+	    * bitflips reached it maximum value,
+	    * block is ok.
+
 config CMD_MUX
 	bool "mux"
 	depends on MULTIPLEXER
@@ -1558,6 +1649,7 @@ config CMD_NVME
 config CMD_ONENAND
 	bool "onenand - access to onenand device"
 	depends on MTD
+	depends on !COMPILE_TEST
 	help
 	  OneNAND is a brand of NAND ('Not AND' gate) flash which provides
 	  various useful features. This command allows reading, writing,
@@ -1567,6 +1659,7 @@ config CMD_ONENAND
 config USE_ONENAND_BOARD_INIT
 	bool "Call onenand_board_init() in the onenand command"
 	depends on CMD_ONENAND
+	depends on !COMPILE_TEST
 
 config CMD_OSD
 	bool "osd"
@@ -1584,6 +1677,15 @@ config CMD_PART
 	help
 	  Read and display information about the partition table on
 	  various media.
+
+config CMD_PART_DUPCHECK
+	bool "part dupcheck"
+	depends on CMD_PART && BLK
+	help
+	  Adds the 'part dupcheck' subcommand, which scans all block devices
+	  and reports any duplicate partition UUIDs (PARTUUIDs) or partition
+	  labels (PARTLABELs). Returns failure if any duplicates are found,
+	  making it suitable for use in boot scripts.
 
 config CMD_PCI
 	bool "pci - Access PCI devices"
@@ -1609,7 +1711,7 @@ config CMD_PINMUX
 	default y if PINCTRL
 	help
 	  Parse all available pin-controllers and show pins muxing. This
-	  is useful for debug purpoer to check the pin muxing and to know if
+	  is useful for debugging purposes to check the pin muxing and to know if
 	  a pin is configured as a GPIO or as an alternate function.
 
 config CMD_POWEROFF
@@ -1622,6 +1724,12 @@ config CMD_READ
 	help
 	  Provides low-level access to the data in a partition.
 
+config CMD_READ_EDID
+	bool "read_edid - Read display EDID"
+	depends on DISPLAY
+	help
+	  Read and parse edid from connected display device.
+
 config CMD_REMOTEPROC
 	bool "remoteproc"
 	depends on REMOTEPROC
@@ -1631,7 +1739,8 @@ config CMD_REMOTEPROC
 
 config CMD_SATA
 	bool "sata - Access SATA subsystem"
-	select SATA
+	depends on SATA && AHCI
+	default y
 	help
 	  SATA (Serial Advanced Technology Attachment) is a serial bus
 	  standard for connecting to hard drives and other storage devices.
@@ -1791,6 +1900,14 @@ endmenu
 
 menu "Shell scripting commands"
 
+
+config CMD_C5_PL330_DMA
+	bool "Release Reset DMA Channels for PL330 Handshake"
+	depends on TARGET_SOCFPGA_CYCLONE5
+	help
+	  Provides access to Reset Manager Per2ModRst. Enables DMA
+	  channels for ARM PrimeCell PL330 via reset release.
+
 config CMD_CAT
 	bool "cat"
 	help
@@ -1837,7 +1954,7 @@ config CMD_XXD
 
 endmenu
 
-if NET || NET_LWIP
+if NET
 
 menuconfig CMD_NET
 	bool "Network commands"
@@ -1845,7 +1962,7 @@ menuconfig CMD_NET
 
 if CMD_NET
 
-if NET
+if NET_LEGACY
 
 config CMD_BOOTP
 	bool "bootp"
@@ -1889,10 +2006,6 @@ config BOOTP_BOOTPATH
 	help
 	  Even though the config is called BOOTP_BOOTPATH, it stores the
 	  path in the variable 'rootpath'.
-
-config BOOTP_VENDOREX
-	bool "Support vendor extensions from BOOTP/DHCP server"
-	depends on CMD_BOOTP
 
 config BOOTP_BOOTFILESIZE
 	bool "Request & store 'bootfilesize' from BOOTP/DHCP server"
@@ -1996,7 +2109,7 @@ config BOOTP_PXE_DHCP_OPTION
 config BOOTP_VCI_STRING
 	string
 	depends on CMD_BOOTP
-	default "U-Boot.armv7" if CPU_V7A || CPU_V7M || CPU_V7R
+	default "U-Boot.armv7" if CPU_V7A || CPU_V7M_V8M || CPU_V7R
 	default "U-Boot.armv8" if ARM64
 	default "U-Boot.arm" if ARM
 	default "U-Boot"
@@ -2035,20 +2148,6 @@ config CMD_RARP
 	bool "rarpboot"
 	help
 	  Boot image via network using RARP/TFTP protocol
-
-config CMD_NFS
-	bool "nfs"
-	help
-	  Boot image via network using NFS protocol.
-
-config NFS_TIMEOUT
-	int "Timeout in milliseconds for NFS mounts"
-	depends on CMD_NFS
-	default 2000
-	help
-	  Timeout in milliseconds used in NFS protocol.  If you encounter
-	  "ERROR: Cannot umount" in nfs command, try longer timeout such as
-	  10000.
 
 config SYS_DISABLE_AUTOLOAD
 	bool "Disable automatically loading files over the network"
@@ -2107,11 +2206,12 @@ config CMD_WOL
 	help
 	  Wait for wake-on-lan Magic Packet
 
-endif  # if NET
+endif  # if NET_LEGACY
 
 config CMD_DHCP
 	bool "dhcp"
 	select PROT_DHCP_LWIP if NET_LWIP
+	select CMD_BOOTP if NET_LEGACY
 	help
 	  Boot image via network using DHCP/TFTP protocol
 
@@ -2144,6 +2244,21 @@ config CMD_MDIO
 	  The MDIO interface is orthogonal to the MII interface and extends
 	  it by adding access to more registers through indirect addressing.
 
+config CMD_NFS
+	bool "nfs"
+	select PROT_UDP_LWIP if NET_LWIP
+	help
+	  Boot image via network using NFS protocol.
+
+config NFS_TIMEOUT
+	int "Timeout in milliseconds for NFS mounts"
+	depends on CMD_NFS
+	default 2000
+	help
+	  Timeout in milliseconds used in NFS protocol.  If you encounter
+	  "ERROR: Cannot umount" in nfs command, try longer timeout such as
+	  10000.
+
 config CMD_PING
 	bool "ping"
 	select PROT_RAW_LWIP if NET_LWIP
@@ -2152,7 +2267,7 @@ config CMD_PING
 
 config CMD_SNTP
 	bool "sntp"
-	select PROT_UDP if NET
+	select PROT_UDP if NET_LEGACY
 	select PROT_UDP_LWIP if NET_LWIP
 	help
 	  Synchronize RTC via network
@@ -2216,13 +2331,13 @@ config WGET_BUILTIN_CACERT_PATH
 config CMD_PXE
 	bool "pxe"
 	select PXE_UTILS
-	imply CMD_TFTPBOOT
+	select CMD_TFTPBOOT
 	help
 	  Boot image via network using PXE protocol
 
 endif  # if CMD_NET
 
-endif # NET || NET_LWIP
+endif # NET
 
 menu "Misc commands"
 
@@ -2425,7 +2540,7 @@ config CMD_SLEEP
 
 config CMD_MP
 	bool "support for multiprocessor commands"
-	depends on MP
+	depends on MP && !CPU
 	default y
 	help
 	  This enables commands to bringup different processors
@@ -2853,6 +2968,7 @@ config CMD_FS_UUID
 
 config CMD_JFFS2
 	bool "jffs2 command"
+	depends on !64BIT
 	select FS_JFFS2
 	help
 	  Enables commands to support the JFFS2 (Journalling Flash File System
@@ -2883,6 +2999,7 @@ config JFFS2_PART_SIZE
 
 config CMD_MTDPARTS
 	bool "MTD partition support"
+	depends on !COMPILE_TEST
 	depends on MTD
 	select MTD_PARTITIONS
 	help
@@ -2996,7 +3113,7 @@ config CMD_EVENT
 
 config CMD_IRQ
 	bool "irq - Show information about interrupts"
-	depends on !ARM && !MIPS && !RISCV && !SH
+	depends on NIOS2 || PPC || X86
 	help
 	  This enables two commands:
 

@@ -243,7 +243,7 @@ static int rcar_gen4_pcie_ltssm_control(struct rcar_gen4_pcie *rcar, bool enable
 
 	clrbits_le32(rcar->app_base + PCIERSTCTRL1, APP_HOLD_PHY_RST);
 
-	ret = readl_poll_timeout(rcar->phy_base + 0x0f8, val, !(val & BIT(18)), 10000);
+	ret = readl_poll_timeout(rcar->phy_base + 0x0f8, val, val & BIT(18), 10000);
 	if (ret < 0)
 		return ret;
 
@@ -306,6 +306,8 @@ static int rcar_gen4_pcie_common_init(struct rcar_gen4_pcie *rcar)
 	if (ret)
 		goto err_unprepare;
 
+	mdelay(1);
+
 	setbits_le32(rcar->app_base + PCIEMSR0,
 		     DEVICE_TYPE_RC |
 		     ((rcar->num_lanes < 4) ? BIFUR_MOD_SET_ON : 0));
@@ -313,6 +315,9 @@ static int rcar_gen4_pcie_common_init(struct rcar_gen4_pcie *rcar)
 	ret = reset_deassert(&rcar->pwr_rst);
 	if (ret)
 		goto err_unprepare;
+
+	reset_status(&rcar->pwr_rst);
+	mdelay(1);
 
 	rcar_gen4_pcie_additional_common_init(rcar);
 
@@ -472,6 +477,10 @@ static int rcar_gen4_pcie_probe(struct udevice *dev)
 
 	if (!rcar_gen4_pcie_link_up(rcar)) {
 		printf("PCIE-%d: Link down\n", dev_seq(dev));
+		rcar_gen4_pcie_ltssm_control(rcar, false);
+		dm_gpio_set_value(&rcar->pe_rst, 1);
+		reset_assert(&rcar->pwr_rst);
+		clk_disable_unprepare(rcar->ref_clk);
 		return -ENODEV;
 	}
 
@@ -484,6 +493,26 @@ static int rcar_gen4_pcie_probe(struct udevice *dev)
 					 PCIE_ATU_TYPE_MEM,
 					 rcar->dw.mem.phys_start,
 					 rcar->dw.mem.bus_start, rcar->dw.mem.size);
+
+	return 0;
+}
+
+/**
+ * rcar_gen4_pcie_remove() - Stop the PCIe bus active link
+ * @dev: A pointer to the device being operated on
+ *
+ * Stop an active link on the PCIe bus and deconfigure the controller.
+ *
+ * Return: 0 on success, else -ENODEV
+ */
+static int rcar_gen4_pcie_remove(struct udevice *dev)
+{
+	struct rcar_gen4_pcie *rcar = dev_get_priv(dev);
+
+	rcar_gen4_pcie_ltssm_control(rcar, false);
+	dm_gpio_set_value(&rcar->pe_rst, 1);
+	reset_assert(&rcar->pwr_rst);
+	clk_disable_unprepare(rcar->ref_clk);
 
 	return 0;
 }
@@ -561,5 +590,7 @@ U_BOOT_DRIVER(rcar_gen4_pcie) = {
 	.ops		= &rcar_gen4_pcie_ops,
 	.of_to_plat	= rcar_gen4_pcie_of_to_plat,
 	.probe		= rcar_gen4_pcie_probe,
+	.remove		= rcar_gen4_pcie_remove,
 	.priv_auto	= sizeof(struct rcar_gen4_pcie),
+	.flags		= DM_FLAG_ACTIVE_DMA,
 };

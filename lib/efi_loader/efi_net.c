@@ -372,7 +372,7 @@ out:
 }
 
 /*
- * efi_net_receive_filters() - mange multicast receive filters
+ * efi_net_receive_filters() - manage multicast receive filters
  *
  * This function implements the ReceiveFilters service of the
  * EFI_SIMPLE_NETWORK_PROTOCOL. See the Unified Extensible Firmware Interface
@@ -1024,8 +1024,10 @@ efi_status_t efi_netobj_set_dp(struct efi_net_obj *netobj, struct efi_device_pat
 		goto add;
 
 	// If it is already installed, try to update it
-	ret = efi_reinstall_protocol_interface(&netobj->header, &efi_guid_device_path,
-					       phandler->protocol_interface, new_net_dp);
+	ret = EFI_CALL(efi_reinstall_protocol_interface(&netobj->header,
+							&efi_guid_device_path,
+							phandler->protocol_interface,
+							new_net_dp));
 	if (ret != EFI_SUCCESS)
 		return ret;
 

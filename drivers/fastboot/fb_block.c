@@ -5,12 +5,21 @@
 
 #include <blk.h>
 #include <div64.h>
+<<<<<<< HEAD
 #include <fastboot-internal.h>
 #include <fastboot.h>
 #include <fb_block.h>
 #include <image-sparse.h>
 #include <part.h>
 #include <malloc.h>
+=======
+#include <fastboot.h>
+#include <fastboot-internal.h>
+#include <fb_block.h>
+#include <image-sparse.h>
+#include <malloc.h>
+#include <part.h>
+>>>>>>> denx/master
 
 /**
  * FASTBOOT_MAX_BLOCKS_ERASE - maximum blocks to erase per derase call
@@ -28,6 +37,14 @@
  */
 #define FASTBOOT_MAX_BLOCKS_WRITE 65536
 
+<<<<<<< HEAD
+=======
+__weak lbaint_t fb_mmc_get_boot_offset(void)
+{
+	return 0;
+}
+
+>>>>>>> denx/master
 struct fb_block_sparse {
 	struct blk_desc	*dev_desc;
 };
@@ -38,16 +55,27 @@ static lbaint_t fb_block_soft_erase(struct blk_desc *block_dev, lbaint_t blk,
 				    void *erase_buffer)
 {
 	lbaint_t blks_written = 0;
+<<<<<<< HEAD
 	int j;
+=======
+	lbaint_t j;
+>>>>>>> denx/master
 
 	memset(erase_buffer, 0, erase_buf_blks * block_dev->blksz);
 
 	for (j = 0; j < cur_blkcnt; j += erase_buf_blks) {
+<<<<<<< HEAD
 		lbaint_t remain = min_t(lbaint_t, cur_blkcnt - j,
 				erase_buf_blks);
 
 		blks_written += blk_dwrite(block_dev, blk + j,
 				remain, erase_buffer);
+=======
+		lbaint_t remain = min(cur_blkcnt - j, erase_buf_blks);
+
+		blks_written += blk_dwrite(block_dev, blk + j,
+					   remain, erase_buffer);
+>>>>>>> denx/master
 		printf(".");
 	}
 
@@ -59,6 +87,7 @@ static lbaint_t fb_block_write(struct blk_desc *block_dev, lbaint_t start,
 {
 	lbaint_t blk = start;
 	lbaint_t blks_written = 0;
+<<<<<<< HEAD
 	lbaint_t cur_blkcnt = 0;
 	lbaint_t blks = 0;
 	void *erase_buf = NULL;
@@ -68,6 +97,17 @@ static lbaint_t fb_block_write(struct blk_desc *block_dev, lbaint_t start,
 
 	for (i = 0; i < blkcnt; i += step) {
 		cur_blkcnt = min((int)blkcnt - i, step);
+=======
+	lbaint_t blks = 0;
+	void *erase_buf = NULL;
+	int erase_buf_blks = 0;
+	lbaint_t step = buffer ? FASTBOOT_MAX_BLOCKS_WRITE : FASTBOOT_MAX_BLOCKS_ERASE;
+	lbaint_t i;
+
+	for (i = 0; i < blkcnt; i += step) {
+		lbaint_t cur_blkcnt = min(blkcnt - i, step);
+
+>>>>>>> denx/master
 		if (buffer) {
 			if (fastboot_progress_callback)
 				fastboot_progress_callback("writing");
@@ -161,7 +201,12 @@ void fastboot_block_raw_erase_disk(struct blk_desc *dev_desc, const char *disk_n
 
 	debug("Start Erasing %s...\n", disk_name);
 
+<<<<<<< HEAD
 	written = fb_block_write(dev_desc, 0, dev_desc->lba, NULL);
+=======
+	written = fb_block_write(dev_desc, fb_mmc_get_boot_offset(),
+				 dev_desc->lba, NULL);
+>>>>>>> denx/master
 	if (written != dev_desc->lba) {
 		pr_err("Failed to erase %s\n", disk_name);
 		fastboot_response("FAIL", response, "Failed to erase %s", disk_name);
@@ -212,7 +257,12 @@ void fastboot_block_erase(const char *part_name, char *response)
 	if (fastboot_block_get_part_info(part_name, &dev_desc, &part_info, response) < 0)
 		return;
 
+<<<<<<< HEAD
 	fastboot_block_raw_erase(dev_desc, &part_info, part_name, 0, response);
+=======
+	fastboot_block_raw_erase(dev_desc, &part_info, part_name,
+				 fb_mmc_get_boot_offset(), response);
+>>>>>>> denx/master
 }
 
 void fastboot_block_write_raw_disk(struct blk_desc *dev_desc, const char *disk_name,
@@ -225,7 +275,11 @@ void fastboot_block_write_raw_disk(struct blk_desc *dev_desc, const char *disk_n
 	blkcnt = ((download_bytes + (dev_desc->blksz - 1)) & ~(dev_desc->blksz - 1));
 	blkcnt = lldiv(blkcnt, dev_desc->blksz);
 
+<<<<<<< HEAD
 	if (blkcnt > dev_desc->lba) {
+=======
+	if ((blkcnt + fb_mmc_get_boot_offset()) > dev_desc->lba) {
+>>>>>>> denx/master
 		pr_err("too large for disk: '%s'\n", disk_name);
 		fastboot_fail("too large for disk", response);
 		return;
@@ -233,7 +287,11 @@ void fastboot_block_write_raw_disk(struct blk_desc *dev_desc, const char *disk_n
 
 	printf("Flashing Raw Image\n");
 
+<<<<<<< HEAD
 	blks = fb_block_write(dev_desc, 0, blkcnt, buffer);
+=======
+	blks = fb_block_write(dev_desc, fb_mmc_get_boot_offset(), blkcnt, buffer);
+>>>>>>> denx/master
 
 	if (blks != blkcnt) {
 		pr_err("failed writing to %s\n", disk_name);

@@ -112,7 +112,7 @@
 
 #if IS_ENABLED(CONFIG_TARGET_VERDIN_AM62P_A53)
 
-#define SPL_VERDIN_AM62P_DTB "spl/dts/k3-am62p5-verdin-wifi-dev.dtb"
+#define SPL_VERDIN_AM62P_DTB "spl/dts/ti/k3-am62p5-verdin-wifi-dev.dtb"
 #define VERDIN_AM62P_DTB "u-boot.dtb"
 
 &binman {
@@ -159,6 +159,38 @@
 
 		fit {
 			images {
+				atf {
+					ti-secure {
+						auth-in-place = <0xa02>;
+
+						firewall-1-0 {
+							insert-template = <&firewall_bg_3>;
+							id = <1>;
+							region = <0>;
+						};
+
+						firewall-1-1 {
+							insert-template = <&firewall_armv8_atf_fg>;
+							id = <1>;
+							region = <1>;
+						};
+
+					};
+				};
+
+				tee {
+					ti-secure {
+						auth-in-place = <0xa02>;
+
+						firewall-1-2 {
+							insert-template = <&firewall_armv8_optee_fg>;
+							id = <1>;
+							region = <2>;
+						};
+
+					};
+				};
+
 				tifsstub-hs {
 					description = "TIFSSTUB";
 					type = "firmware";

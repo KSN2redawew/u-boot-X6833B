@@ -916,8 +916,6 @@ static ulong meson_clk_set_rate_by_id(struct clk *clk, unsigned long id,
 			return -EINVAL;
 	case CLKID_PCIE_PLL:
 		return meson_pcie_pll_set_rate(clk, rate);
-
-		return 0;
 	case CLKID_VPU:
 		return meson_clk_set_rate_by_id(clk,
 				meson_mux_get_parent(clk, CLKID_VPU), rate,
@@ -948,6 +946,11 @@ static ulong meson_clk_set_rate_by_id(struct clk *clk, unsigned long id,
 	case CLKID_HDMI:
 		return meson_clk_set_rate_by_id(clk, CLKID_HDMI_DIV,
 						rate, current_rate);
+	case CLKID_SD_EMMC_A_CLK0:
+	case CLKID_SD_EMMC_B_CLK0:
+	case CLKID_SD_EMMC_C_CLK0:
+		/* TOFIX: implement rate set for MMC clocks */
+		return 0;
 	default:
 		return -ENOENT;
 	}

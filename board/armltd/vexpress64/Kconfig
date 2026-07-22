@@ -21,6 +21,9 @@ config VEXPRESS64_BASE_MODEL
 	imply EFI_SET_TIME if DM_RTC
 	select LINUX_KERNEL_IMAGE_HEADER
 	select POSITION_INDEPENDENT
+	imply DM_RNG
+	imply RNG_ARM_RNDR
+	select ARM_SMCCC
 
 choice
 	prompt "VExpress64 board variant"
@@ -38,7 +41,8 @@ config TARGET_VEXPRESS64_BASER_FVP
 config TARGET_VEXPRESS64_JUNO
 	bool "Support Versatile Express Juno Development Platform"
 	select PCIE_ECAM_GENERIC if PCI
-	select SATA_SIL
+	select SATA if PCI
+	select SATA_SIL if PCI
 	select SMC911X if DM_ETH
 	select SMC911X_32_BIT if SMC911X
 	select CMD_USB if USB
@@ -46,6 +50,7 @@ config TARGET_VEXPRESS64_JUNO
 	select USB_EHCI_GENERIC if USB
 	select USB_OHCI_HCD if USB
 	select USB_OHCI_GENERIC if USB
+	select ARM_SMCCC
 	imply OF_HAS_PRIOR_STAGE
 
 endchoice

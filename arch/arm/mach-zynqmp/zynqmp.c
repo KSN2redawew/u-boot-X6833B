@@ -57,7 +57,7 @@ static int do_zynqmp_verify_secure(struct cmd_tbl *cmdtp, int flag, int argc,
 	}
 
 	ret = xilinx_pm_request(PM_SECURE_IMAGE, src_lo, src_hi,
-				key_lo, key_hi, ret_payload);
+				key_lo, key_hi, 0, 0, ret_payload);
 	if (ret) {
 		printf("Failed: secure op status:0x%x\n", ret);
 	} else {
@@ -260,7 +260,7 @@ static int do_zynqmp_rsa(struct cmd_tbl *cmdtp, int flag, int argc,
 
 	ret = xilinx_pm_request(PM_SECURE_RSA, upper_32_bits((ulong)srcaddr),
 				lower_32_bits((ulong)srcaddr), srclen, rsaop,
-				ret_payload);
+				0, 0, ret_payload);
 	if (ret || ret_payload[1]) {
 		printf("Failed: RSA status:0x%x, errcode:0x%x\n",
 		       ret, ret_payload[1]);
@@ -309,7 +309,7 @@ static int do_zynqmp_sha3(struct cmd_tbl *cmdtp, int flag,
 			   srcaddr + roundup(srclen, ARCH_DMA_MINALIGN));
 
 	ret = xilinx_pm_request(PM_SECURE_SHA, 0, 0, 0,
-				ZYNQMP_SHA3_INIT, ret_payload);
+				ZYNQMP_SHA3_INIT, 0, 0, ret_payload);
 	if (ret || ret_payload[1]) {
 		printf("Failed: SHA INIT status:0x%x, errcode:0x%x\n",
 		       ret, ret_payload[1]);
@@ -318,7 +318,7 @@ static int do_zynqmp_sha3(struct cmd_tbl *cmdtp, int flag,
 
 	ret = xilinx_pm_request(PM_SECURE_SHA, upper_32_bits((ulong)srcaddr),
 				lower_32_bits((ulong)srcaddr),
-				srclen, ZYNQMP_SHA3_UPDATE, ret_payload);
+				srclen, ZYNQMP_SHA3_UPDATE, 0, 0, ret_payload);
 	if (ret || ret_payload[1]) {
 		printf("Failed: SHA UPDATE status:0x%x, errcode:0x%x\n",
 		       ret, ret_payload[1]);
@@ -328,7 +328,7 @@ static int do_zynqmp_sha3(struct cmd_tbl *cmdtp, int flag,
 	ret = xilinx_pm_request(PM_SECURE_SHA, upper_32_bits((ulong)hashaddr),
 				lower_32_bits((ulong)hashaddr),
 				ZYNQMP_SHA3_SIZE, ZYNQMP_SHA3_FINAL,
-				ret_payload);
+				0, 0, ret_payload);
 	if (ret || ret_payload[1]) {
 		printf("Failed: SHA FINAL status:0x%x, errcode:0x%x\n",
 		       ret, ret_payload[1]);
@@ -362,6 +362,35 @@ static int do_zynqmp_reboot(struct cmd_tbl *cmdtp, int flag,
 	return CMD_RET_SUCCESS;
 }
 
+static int do_zynqmp_verify_auth(struct cmd_tbl *cmdtp, int flag,
+				 int argc, char * const argv[])
+{
+	u32 status;
+	int ret;
+
+	ret = zynqmp_mmio_read((ulong)&csu_base->status, &status);
+	if (ret) {
+		printf("Can't obtain boot auth state\n");
+		return CMD_RET_FAILURE;
+	}
+
+	if (status & ZYNQMP_CSU_STATUS_AUTHENTICATED) {
+		debug("Boot is authenticated\n");
+
+		ret = env_set("boot_auth", "1");
+		if (ret)
+			return CMD_RET_FAILURE;
+	} else {
+		debug("Boot is not authenticated\n");
+
+		ret = env_set("boot_auth", "0");
+		if (ret)
+			return CMD_RET_FAILURE;
+	}
+
+	return CMD_RET_SUCCESS;
+}
+
 static struct cmd_tbl cmd_zynqmp_sub[] = {
 	U_BOOT_CMD_MKENT(secure, 5, 0, do_zynqmp_verify_secure, "", ""),
 	U_BOOT_CMD_MKENT(pmufw, 4, 0, do_zynqmp_pmufw, "", ""),
@@ -371,6 +400,7 @@ static struct cmd_tbl cmd_zynqmp_sub[] = {
 	U_BOOT_CMD_MKENT(rsa, 7, 0, do_zynqmp_rsa, "", ""),
 	U_BOOT_CMD_MKENT(sha3, 5, 0, do_zynqmp_sha3, "", ""),
 	U_BOOT_CMD_MKENT(reboot, 3, 0, do_zynqmp_reboot, "", ""),
+	U_BOOT_CMD_MKENT(verify_auth, 2, 0, do_zynqmp_verify_auth, "", ""),
 #ifdef CONFIG_DEFINE_TCM_OCM_MMAP
 	U_BOOT_CMD_MKENT(tcminit, 3, 0, do_zynqmp_tcm_init, "", ""),
 #endif
@@ -446,6 +476,8 @@ U_BOOT_LONGHELP(zynqmp,
 	"	48 bytes hash value into srcaddr\n"
 	"	Optional key_addr can be specified for saving sha3 hash value\n"
 	"	Note: srcaddr/srclen should not be 0\n"
+	"zynqmp verify_auth - verifies if boot.bin was authenticated\n"
+	"	Create boot_auth var : 0 not authenticated, 1 authenticated\n"
 	);
 
 U_BOOT_CMD(

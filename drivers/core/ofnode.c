@@ -164,15 +164,20 @@ void *ofnode_lookup_fdt(ofnode node)
 
 void *ofnode_to_fdt(ofnode node)
 {
+	void *fdt;
+
 #ifdef OF_CHECKS
 	if (of_live_active())
-		return NULL;
+		panic("%s called with live tree in use!\n", __func__);
 #endif
 	if (CONFIG_IS_ENABLED(OFNODE_MULTI_TREE) && ofnode_valid(node))
-		return ofnode_lookup_fdt(node);
+		fdt = ofnode_lookup_fdt(node);
+	else
+		fdt = (void *)gd->fdt_blob;
 
-	/* Use the control FDT by default */
-	return (void *)gd->fdt_blob;
+	assert(fdt);
+
+	return fdt;
 }
 
 /**
@@ -656,6 +661,54 @@ int ofnode_read_u32_array(ofnode node, const char *propname,
 				return -EOVERFLOW;
 		}
 		return ret;
+	}
+}
+
+int ofnode_read_u64_array(ofnode node, const char *propname,
+			  u64 *out_values, size_t sz)
+{
+	assert(ofnode_valid(node));
+	log_debug("%s: %s: ", __func__, propname);
+
+	if (ofnode_is_np(node)) {
+		return of_read_u64_array(ofnode_to_np(node), propname,
+					 out_values, sz);
+	} else {
+		int ret;
+
+		ret = fdtdec_get_long_array(ofnode_to_fdt(node),
+					   ofnode_to_offset(node), propname,
+					   out_values, sz);
+
+		/* get the error right, but space is more important in SPL */
+		if (!IS_ENABLED(CONFIG_XPL_BUILD)) {
+			if (ret == -FDT_ERR_NOTFOUND)
+				return -EINVAL;
+			else if (ret == -FDT_ERR_BADLAYOUT)
+				return -EOVERFLOW;
+		}
+		return ret;
+	}
+}
+
+int ofnode_count_elems_of_size(ofnode node, const char *propname, int elem_size)
+{
+	const char *prop;
+	int len;
+	assert(ofnode_valid(node));
+
+	if (ofnode_is_np(node)) {
+		return of_property_count_elems_of_size(node.np, propname, elem_size);
+	} else {
+		prop = fdt_getprop(ofnode_to_fdt(node), ofnode_to_offset(node), propname, &len);
+		if (!prop)
+			return -ENOENT;
+		if (len % elem_size != 0) {
+			log_debug("size of %s in node %pOF is not a multiple of %d\n",
+			       propname, &node, elem_size);
+			return -EINVAL;
+		}
+		return len / elem_size;
 	}
 }
 
@@ -1221,13 +1274,16 @@ int ofnode_decode_display_timing(ofnode parent, int index,
 	int ret = 0;
 
 	timings = ofnode_find_subnode(parent, "display-timings");
-	if (!ofnode_valid(timings))
-		return -EINVAL;
-
-	i = 0;
-	ofnode_for_each_subnode(node, timings) {
-		if (i++ == index)
-			break;
+	if (ofnode_valid(timings)) {
+		i = 0;
+		ofnode_for_each_subnode(node, timings) {
+			if (i++ == index)
+				break;
+		}
+	} else {
+		if (index != 0)
+			return -EINVAL;
+		node = ofnode_find_subnode(parent, "panel-timing");
 	}
 
 	if (!ofnode_valid(node))
@@ -1628,18 +1684,6 @@ bool ofnode_pre_reloc(ofnode node)
 	if (ofnode_read_bool(node, "bootph-pre-ram") ||
 	    ofnode_read_bool(node, "bootph-pre-sram"))
 		return gd->flags & GD_FLG_RELOC;
-
-	if (IS_ENABLED(CONFIG_OF_TAG_MIGRATE)) {
-		/* detect and handle old tags */
-		if (ofnode_read_bool(node, "u-boot,dm-pre-reloc") ||
-		    ofnode_read_bool(node, "u-boot,dm-pre-proper") ||
-		    ofnode_read_bool(node, "u-boot,dm-spl") ||
-		    ofnode_read_bool(node, "u-boot,dm-tpl") ||
-		    ofnode_read_bool(node, "u-boot,dm-vpl")) {
-			gd->flags |= GD_FLG_OF_TAG_MIGRATE;
-			return true;
-		}
-	}
 
 	return false;
 #endif

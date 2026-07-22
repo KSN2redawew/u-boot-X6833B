@@ -289,6 +289,11 @@ static int rockchip_dram_init_banksize(void)
 }
 #endif
 
+__weak int rockchip_dram_init_banksize_fixup(struct bd_info *bd)
+{
+	return 0;
+}
+
 int dram_init_banksize(void)
 {
 	size_t ram_top = (unsigned long)(gd->ram_size + CFG_SYS_SDRAM_BASE);
@@ -342,7 +347,22 @@ int dram_init_banksize(void)
 #endif
 #endif
 
-	return 0;
+	return rockchip_dram_init_banksize_fixup(gd->bd);
+}
+
+u8 rockchip_sdram_type(phys_addr_t reg)
+{
+	u32 dram_type, version;
+	u32 sys_reg2 = readl(reg);
+	u32 sys_reg3 = readl(reg + 4);
+
+	dram_type = (sys_reg2 >> SYS_REG_DDRTYPE_SHIFT) & SYS_REG_DDRTYPE_MASK;
+	version = (sys_reg3 >> SYS_REG_VERSION_SHIFT) & SYS_REG_VERSION_MASK;
+	if (version >= 3)
+		dram_type |= ((sys_reg3 >> SYS_REG_EXTEND_DDRTYPE_SHIFT) &
+			      SYS_REG_EXTEND_DDRTYPE_MASK) << 3;
+
+	return dram_type;
 }
 
 size_t rockchip_sdram_size(phys_addr_t reg)

@@ -3,6 +3,7 @@
  * (C) Copyright 2019 Rockchip Electronics Co., Ltd
  */
 
+#include <binman_sym.h>
 #include <cpu_func.h>
 #include <debug_uart.h>
 #include <dm.h>
@@ -10,6 +11,7 @@
 #include <image.h>
 #include <init.h>
 #include <log.h>
+#include <mapmem.h>
 #include <ram.h>
 #include <spl.h>
 #include <asm/arch-rockchip/bootrom.h>
@@ -31,6 +33,21 @@ int board_return_to_bootrom(struct spl_image_info *spl_image,
 __weak const char * const boot_devices[BROM_LAST_BOOTSOURCE + 1] = {
 };
 
+__weak u32 read_brom_bootsource_id(void)
+{
+	u32 bootsource_id = readl(BROM_BOOTSOURCE_ID_ADDR);
+
+	/* Re-map the raw value read from reg to an existing BROM_BOOTSOURCE
+	 * enum value to avoid having to create a larger boot_devices table.
+	 */
+	if (bootsource_id == 0x81)
+		return BROM_BOOTSOURCE_USB;
+	else if (bootsource_id > BROM_LAST_BOOTSOURCE)
+		log_debug("Unknown bootsource %x\n", bootsource_id);
+
+	return bootsource_id;
+}
+
 const char *board_spl_was_booted_from(void)
 {
 	static u32 brom_bootsource_id_cache = BROM_BOOTSOURCE_UNKNOWN;
@@ -40,7 +57,7 @@ const char *board_spl_was_booted_from(void)
 	if (brom_bootsource_id_cache != BROM_BOOTSOURCE_UNKNOWN)
 		bootdevice_brom_id = brom_bootsource_id_cache;
 	else
-		bootdevice_brom_id = readl(BROM_BOOTSOURCE_ID_ADDR);
+		bootdevice_brom_id = read_brom_bootsource_id();
 
 	if (bootdevice_brom_id < ARRAY_SIZE(boot_devices))
 		bootdevice_ofpath = boot_devices[bootdevice_brom_id];
@@ -135,3 +152,52 @@ void spl_board_prepare_for_boot(void)
 
 	cleanup_before_linux();
 }
+
+#if CONFIG_IS_ENABLED(RAM_DEVICE) && IS_ENABLED(CONFIG_SPL_LOAD_FIT)
+binman_sym_declare_optional(ulong, payload, image_pos);
+binman_sym_declare_optional(ulong, payload, size);
+
+static ulong ramboot_load_read(struct spl_load_info *load, ulong sector,
+			       ulong count, void *buf)
+{
+	ulong addr = IF_ENABLED_INT(CONFIG_SPL_LOAD_FIT,
+				    CONFIG_SPL_LOAD_FIT_ADDRESS);
+
+	memcpy(buf, map_sysmem(addr + sector, 0), count);
+	return count;
+}
+
+static int ramboot_load_image(struct spl_image_info *spl_image,
+			      struct spl_boot_device *bootdev)
+{
+	struct legacy_img_hdr *header;
+	ulong addr = IF_ENABLED_INT(CONFIG_SPL_LOAD_FIT,
+				    CONFIG_SPL_LOAD_FIT_ADDRESS);
+	ulong image_pos = binman_sym(ulong, payload, image_pos);
+	ulong size = binman_sym(ulong, payload, size);
+
+	if (addr == CFG_SYS_SDRAM_BASE || addr == CONFIG_SPL_TEXT_BASE)
+		return -ENODEV;
+
+	if (image_pos != BINMAN_SYM_MISSING && size != BINMAN_SYM_MISSING) {
+		header = map_sysmem(image_pos, 0);
+		if (image_get_magic(header) == FDT_MAGIC) {
+			memmove(map_sysmem(addr, 0), header, size);
+			memset(header, 0, sizeof(*header));
+		}
+	}
+
+	header = map_sysmem(addr, 0);
+	if (image_get_magic(header) == FDT_MAGIC) {
+		struct spl_load_info load;
+
+		spl_load_init(&load, ramboot_load_read, NULL, 1);
+		return spl_load_simple_fit(spl_image, &load, 0, header);
+	}
+
+	return -ENODEV;
+}
+
+/* Use priority and method name that sort before default spl_ram_load_image */
+SPL_LOAD_IMAGE_METHOD("RAM", 0, BOOT_DEVICE_RAM, ramboot_load_image);
+#endif

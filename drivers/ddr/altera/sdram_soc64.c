@@ -32,7 +32,7 @@
 #define SINGLE_RANK_CLAMSHELL	0xc3c3
 #define DUAL_RANK_CLAMSHELL	0xa5a5
 
-#if !IS_ENABLED(CONFIG_TARGET_SOCFPGA_AGILEX5) && !IS_ENABLED(CONFIG_TARGET_SOCFPGA_AGILEX7M)
+#if !IS_ENABLED(CONFIG_ARCH_SOCFPGA_AGILEX5) && !IS_ENABLED(CONFIG_ARCH_SOCFPGA_AGILEX7M)
 u32 hmc_readl(struct altera_sdram_plat *plat, u32 reg)
 {
 	return readl(plat->iomhc + reg);
@@ -85,11 +85,11 @@ int emif_reset(struct altera_sdram_plat *plat)
 	debug("DDR: Triggerring emif reset\n");
 	hmc_ecc_writel(plat, DDR_HMC_CORE2SEQ_INT_REQ, RSTHANDSHAKECTRL);
 
-	/* if seq2core[3] = 0, we are good */
+	/* if seq2core[2:0] = 0b0000_0111, we are good */
 	ret = wait_for_bit_le32((const void *)(plat->hmc +
 				 RSTHANDSHAKESTAT),
-				 DDR_HMC_SEQ2CORE_INT_RESP_MASK,
-				 false, 1000, false);
+				 DDR_HMC_SEQ2CORE_INT_REQ_ACK_MASK,
+				 true, 1000, false);
 	if (ret) {
 		printf("DDR: failed to get ack from EMIF\n");
 		return ret;
@@ -106,7 +106,7 @@ int emif_reset(struct altera_sdram_plat *plat)
 }
 #endif
 
-#if !(IS_ENABLED(CONFIG_TARGET_SOCFPGA_N5X) || IS_ENABLED(CONFIG_TARGET_SOCFPGA_AGILEX5))
+#if !(IS_ENABLED(CONFIG_ARCH_SOCFPGA_N5X) || IS_ENABLED(CONFIG_ARCH_SOCFPGA_AGILEX5))
 int poll_hmc_clock_status(void)
 {
 	return wait_for_bit_le32((const void *)(socfpga_get_sysmgr_addr() +
@@ -347,7 +347,7 @@ static void sdram_set_firewall_non_f2sdram(struct bd_info *bd)
 	}
 }
 
-#if IS_ENABLED(CONFIG_TARGET_SOCFPGA_AGILEX5)
+#if IS_ENABLED(CONFIG_ARCH_SOCFPGA_AGILEX5)
 static void sdram_set_firewall_f2sdram(struct bd_info *bd)
 {
 	u32 i, lower, upper;
@@ -397,22 +397,22 @@ void sdram_set_firewall(struct bd_info *bd)
 {
 	sdram_set_firewall_non_f2sdram(bd);
 
-#if IS_ENABLED(CONFIG_TARGET_SOCFPGA_AGILEX5)
+#if IS_ENABLED(CONFIG_ARCH_SOCFPGA_AGILEX5)
 	sdram_set_firewall_f2sdram(bd);
 #endif
 }
 
 static int altera_sdram_of_to_plat(struct udevice *dev)
 {
-#if !IS_ENABLED(CONFIG_TARGET_SOCFPGA_N5X)
+#if !IS_ENABLED(CONFIG_ARCH_SOCFPGA_N5X)
 	struct altera_sdram_plat *plat = dev_get_plat(dev);
 	fdt_addr_t addr;
 #endif
 
 	/* These regs info are part of DDR handoff in bitstream */
-#if IS_ENABLED(CONFIG_TARGET_SOCFPGA_N5X)
+#if IS_ENABLED(CONFIG_ARCH_SOCFPGA_N5X)
 	return 0;
-#elif IS_ENABLED(CONFIG_TARGET_SOCFPGA_AGILEX5) || IS_ENABLED(CONFIG_TARGET_SOCFPGA_AGILEX7M)
+#elif IS_ENABLED(CONFIG_ARCH_SOCFPGA_AGILEX5) || IS_ENABLED(CONFIG_ARCH_SOCFPGA_AGILEX7M)
 	addr = dev_read_addr_index(dev, 0);
 	if (addr == FDT_ADDR_T_NONE)
 		return -EINVAL;

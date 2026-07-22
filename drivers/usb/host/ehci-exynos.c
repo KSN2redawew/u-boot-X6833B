@@ -47,8 +47,7 @@ static int ehci_usb_of_to_plat(struct udevice *dev)
 {
 	struct exynos_ehci_plat *plat = dev_get_plat(dev);
 	const void *blob = gd->fdt_blob;
-	unsigned int node;
-	int depth;
+	int node, depth;
 
 	/*
 	 * Get the base address for XHCI controller from the device node
@@ -250,7 +249,7 @@ static const struct udevice_id ehci_usb_ids[] = {
 	{ }
 };
 
-U_BOOT_DRIVER(usb_ehci) = {
+U_BOOT_DRIVER(ehci_exynos) = {
 	.name	= "ehci_exynos",
 	.id	= UCLASS_USB,
 	.of_match = ehci_usb_ids,

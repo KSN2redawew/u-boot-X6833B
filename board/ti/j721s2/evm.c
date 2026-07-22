@@ -40,7 +40,7 @@ phys_addr_t board_get_usable_ram_top(phys_size_t total_size)
 }
 
 #if defined(CONFIG_XPL_BUILD)
-void spl_perform_fixups(struct spl_image_info *spl_image)
+void spl_perform_board_fixups(struct spl_image_info *spl_image)
 {
 	if (IS_ENABLED(CONFIG_K3_DDRSS)) {
 		if (IS_ENABLED(CONFIG_K3_INLINE_ECC))
@@ -103,7 +103,7 @@ static struct ti_fdt_map ti_j721s2_evm_fdt_map[] = {
 
 static void setup_board_eeprom_env(void)
 {
-	char *name = "j721s2";
+	char *name = NULL;
 
 	if (do_board_detect())
 		goto invalid_eeprom;

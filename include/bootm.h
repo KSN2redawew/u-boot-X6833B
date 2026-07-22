@@ -25,7 +25,7 @@ struct cmd_tbl;
  * @addr_img: Address of image to bootm, as passed to
  *	genimg_get_kernel_addr_fit() for processing:
  *
- *    NULL: Usees default load address, i.e. image_load_addr
+ *    NULL: Uses default load address, i.e. image_load_addr
  *    <addr>: Uses hex address
  *
  * For FIT:
@@ -320,5 +320,15 @@ void zimage_dump(struct boot_params *base_ptr, bool show_cmdline);
  * @cmdline: Command line to set
  */
 int bootm_boot_start(ulong addr, const char *cmdline);
+
+/**
+ * bootm_final() - Announce and do cleanup before boot
+ *
+ * This performs the common pre-boot steps: printing the "Starting kernel"
+ * message, recording bootstage data, and removing active devices.
+ *
+ * @flag: Boot state flags (BOOTM_STATE_OS_FAKE_GO prints a fake-run message)
+ */
+void bootm_final(int flag);
 
 #endif
