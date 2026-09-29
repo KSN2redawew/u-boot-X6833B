@@ -2263,6 +2263,10 @@ __acquires(musb->lock)
 	u8		devctl = musb_readb(mbase, MUSB_DEVCTL);
 	u8		power;
 
+	/* v38: a bus reset must return us to address 0, otherwise the core
+	 * stays on the stale FADDR while the host re-enumerates at addr 0. */
+	musb_writeb(mbase, MUSB_FADDR, 0);
+
 #ifndef __UBOOT__
 	dev_dbg(musb->controller, "<== %s addr=%x driver '%s'\n",
 			(devctl & MUSB_DEVCTL_BDEVICE)

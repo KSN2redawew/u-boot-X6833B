@@ -19,3 +19,7 @@ obj-$(CONFIG_USB_MUSB_SC5XX) += sc5xx.o
 ccflags-y := $(call cc-option,-Wno-unused-variable) \
 		$(call cc-option,-Wno-unused-but-set-variable) \
 		$(call cc-option,-Wno-unused-label)
+
+# Linux<->U-Boot compat sections inside musb core/gadget sources
+ccflags-$(CONFIG_USB_MUSB_GADGET) += -D__UBOOT__
+ccflags-$(CONFIG_USB_MUSB_HOST) += -D__UBOOT__

@@ -90,14 +90,8 @@ config FASTBOOT_USB_DEV
 
 config FASTBOOT_FLASH
 	bool "Enable FASTBOOT FLASH command"
-<<<<<<< HEAD
 	default y if ARCH_SUNXI || ARCH_ROCKCHIP
 	depends on MMC || (MTD_RAW_NAND && CMD_MTDPARTS) || BLK
-=======
-	default y if ARCH_SUNXI && ( MMC || MTD_RAW_NAND )
-	default y if ARCH_ROCKCHIP && MMC
-	depends on MMC || (MTD_RAW_NAND && CMD_MTDPARTS) || DM_SPI_FLASH || BLK
->>>>>>> denx/master
 	select IMAGE_SPARSE
 	help
 	  The fastboot protocol includes a "flash" command for writing
@@ -210,10 +204,7 @@ config FASTBOOT_MMC_USER_NAME
 config FASTBOOT_FLASH_BLOCK_INTERFACE_NAME
 	string "Define FASTBOOT block interface name"
 	depends on FASTBOOT_FLASH_BLOCK
-<<<<<<< HEAD
 	default ""
-=======
->>>>>>> denx/master
 	help
 	  The fastboot "flash" and "erase" commands support operations
 	  on any Block device, this should specify the block device name
@@ -231,14 +222,9 @@ config FASTBOOT_FLASH_BLOCK_DEVICE_ID
 	  The fastboot "flash" and "erase" commands support operations
 	  on any Block device, this should specify the block device
 	  identifier on the system, as a number.
-<<<<<<< HEAD
           The device identifier should be 0 for first device on the
 	  interface type specified in FLASH_BLOCK_INTERFACE_NAME config,
 	  1 the second, etc...
-=======
-	  Device identifiers are numbered starting from 0 and the most
-	  common case is to use the first controller on the system.
->>>>>>> denx/master
 
 config FASTBOOT_GPT_NAME
 	string "Target name for updating GPT"

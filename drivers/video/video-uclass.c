@@ -18,6 +18,9 @@
 #include <video.h>
 #include <video_console.h>
 #include <asm/cache.h>
+#include <asm/unaligned.h>
+#include <linux/byteorder/generic.h>
+#include <bmp_layout.h>
 #include <asm/global_data.h>
 #include <dm/lists.h>
 #include <dm/device_compat.h>
@@ -597,14 +600,86 @@ void *video_get_u_boot_logo(void)
 	return SPLASH_START(u_boot_logo);
 }
 
-static int show_splash(struct udevice *dev)
+	static int show_splash(struct udevice *dev)
+	{
+		struct video_priv *priv = dev_get_uclass_priv(dev);
+		struct bmp_image *bmp = (struct bmp_image *)SPLASH_START(u_boot_logo);
+		u8 *data = SPLASH_START(u_boot_logo);
+		u32 w, h, off, dx, dy;
+		u8 *src;
+		int x, y;
+		int bpp = VNBYTES(priv->bpix);
+		const u32 margin = 4;
+		int ret;
+
+		printf("SPLASH: fb=%ux%u fmt=%d bpix=%d\n",
+				priv->xsize, priv->ysize, priv->format, priv->bpix);
+
+		ret = video_bmp_display(dev, map_to_sysmem(data), -4, 4, true);
+		printf("SPLASH: bmp_ret=%d\n", ret);
+
+		w = le32_to_cpu(bmp->header.width);
+		h = le32_to_cpu(bmp->header.height);
+		off = le32_to_cpu(bmp->header.data_offset);
+		if (!w || !h || w > 4096 || h > 4096) {
+				printf("SPLASH: bad bmp %ux%u\n", w, h);
+				return 0;
+		}
+		dx = (priv->xsize > w + margin) ? priv->xsize - w - margin : 0;
+		dy = margin;
+		src = data + off;
+		for (y = 0; y < h; y++) {
+				u8 *row = src + (h - 1 - y) * (((w * 3) + 3) & ~3);
+				u8 *dst = (u8 *)priv->fb + (dy + y) * priv->line_length + dx * bpp;
+				for (x = 0; x < w; x++) {
+						u8 b = row[x * 3 + 0];
+						u8 g = row[x * 3 + 1];
+						u8 r = row[x * 3 + 2];
+						switch (priv->format) {
+						case VIDEO_X8R8G8B8:
+						case VIDEO_ARGB8888:
+								*(u32 *)(dst + x * 4) = 0xff000000 | (r << 16) |
+										(g << 8) | b;
+								break;
+						case VIDEO_X8B8G8R8:
+								*(u32 *)(dst + x * 4) = 0xff000000 | (b << 16) |
+										(g << 8) | r;
+								break;
+						case VIDEO_RGBA8888:
+								*(u32 *)(dst + x * 4) = (r << 24) | (g << 16) |
+										(b << 8) | 0xff;
+								break;
+						case VIDEO_X2R10G10B10:
+								*(u32 *)(dst + x * 4) = (r << 22) | (g << 12) |
+										(b << 2);
+								break;
+						default:
+								if (bpp == 2) {
+										*(u16 *)(dst + x * 2) =
+												((r & 0xf8) << 8) |
+												((g & 0xfc) << 3) | (b >> 3);
+								} else {
+										goto splash_done;
+								}
+						}
+				}
+		}
+		splash_done:
+		printf("SPLASH: drawn %ux%u at %u,%u\n", w, h, dx, dy);
+
+		return 0;
+	}
+
+	int video_show_splash(void)
 {
-	u8 *data = SPLASH_START(u_boot_logo);
+	struct udevice *dev;
 	int ret;
 
-	ret = video_bmp_display(dev, map_to_sysmem(data), -4, 4, true);
+	ret = uclass_first_device_err(UCLASS_VIDEO, &dev);
+	if (ret || !dev)
+		return -ENODEV;
 
-	return 0;
+	return show_splash(dev);
 }
 
 int video_default_font_height(struct udevice *dev)

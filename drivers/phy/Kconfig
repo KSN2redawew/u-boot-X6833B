@@ -292,20 +292,6 @@ config PHY_MTK_UFS
 	  initialization, power on and power off flow of
 	  specified M-PHYs.
 
-<<<<<<< HEAD
-=======
-config PHY_MTK_XSPHY
-	bool "MediaTek XS-PHY Driver"
-	depends on PHY
-	depends on ARCH_MEDIATEK
-	select REGMAP
-	select SYSCON
-	help
-	  Enable this to support the SuperSpeedPlus XS-PHY transceiver for
-	  USB3.1 GEN2 controllers on MediaTek chips. The driver supports
-	  multiple USB2.0, USB3.1 GEN2 ports.
-
->>>>>>> denx/master
 config PHY_NPCM_USB
 	bool "Nuvoton NPCM USB PHY support"
 	depends on PHY

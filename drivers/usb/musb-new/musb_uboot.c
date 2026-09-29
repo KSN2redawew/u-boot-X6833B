@@ -372,18 +372,43 @@ struct dm_usb_ops musb_usb_ops = {
 #endif /* CONFIG_IS_ENABLED(DM_USB) */
 #endif /* CONFIG_USB_MUSB_HOST */
 
-#if defined(CONFIG_USB_MUSB_GADGET) && !CONFIG_IS_ENABLED(DM_USB_GADGET)
+#if defined(CONFIG_USB_MUSB_GADGET)
 static struct musb *gadget;
+#endif
 
-int dm_usb_gadget_handle_interrupts(struct udevice *dev)
+#if defined(CONFIG_USB_MUSB_GADGET)
+int musb_gadget_handle_interrupts(struct udevice *dev)
 {
 	schedule();
 	if (!gadget || !gadget->isr)
 		return -EINVAL;
 
+	/* U-Boot's musb_stage0_irq skips bus-reset handling (#ifndef __UBOOT__),
+	 * so we must do it here: reset the ep0 state machine when the host
+	 * re-enumerates (cable re-plug, boot handoff, etc).
+	 */
+	if (gadget->mregs) {
+		u8 intr = musb_readb(gadget->mregs, MUSB_INTRUSB);
+
+		if (intr & MUSB_INTR_RESET) {
+			/* THE fix: a bus reset must return us to address 0.
+			 * Without this the core stays on the old FADDR (e.g. 0x11)
+			 * while the host re-enumerates at addr 0, the core never
+			 * answers -> DEVICE_DESCRIPTOR_FAILURE / endless resets.
+			 */
+			printf("MUSB-RESET: devctl=%02x power=%02x\n",
+			       musb_readb(gadget->mregs, MUSB_DEVCTL),
+			       musb_readb(gadget->mregs, MUSB_POWER));
+			musb_writeb(gadget->mregs, MUSB_FADDR, 0);
+			musb_g_reset(gadget);
+		}
+	}
+
 	return gadget->isr(0, gadget);
 }
+#endif
 
+#if defined(CONFIG_USB_MUSB_GADGET)
 int usb_gadget_register_driver(struct usb_gadget_driver *driver)
 {
 	int ret;
@@ -435,16 +460,18 @@ struct musb *musb_register(struct musb_hdrc_platform_data *plat, void *bdata,
 		musbp = &musb_host.host;
 		break;
 #endif
-#if defined(CONFIG_USB_MUSB_GADGET) && !CONFIG_IS_ENABLED(DM_USB_GADGET)
+#if defined(CONFIG_USB_MUSB_GADGET)
 	case MUSB_PERIPHERAL:
 		musbp = &gadget;
 		break;
 #endif
 	default:
+		printf("MUSB-REG: bad mode %d\n", plat->mode);
 		return ERR_PTR(-EINVAL);
 	}
 
 	*musbp = musb_init_controller(plat, (struct device *)bdata, ctl_regs);
+	printf("MUSB-REG: mode=%d musb_ret=%lx\n", plat->mode, (unsigned long)*musbp);
 	if (IS_ERR(*musbp)) {
 		printf("Failed to init the controller\n");
 		return ERR_CAST(*musbp);

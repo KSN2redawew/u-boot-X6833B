@@ -7,11 +7,14 @@
  * Rob Herring <robh@kernel.org>
  */
 #include <command.h>
+#include <dm/device.h>
+#include <dm/uclass.h>
 #include <console.h>
 #include <g_dnl.h>
 #include <fastboot.h>
 #include <net.h>
 #include <usb.h>
+#include <video.h>
 #include <watchdog.h>
 #include <linux/printk.h>
 #include <linux/stringify.h>
@@ -83,13 +86,16 @@ static int do_fastboot_usb(int argc, char *const argv[],
 	}
 
 	ret = udc_device_get_by_index(controller_index, &udc);
+	printf("FB-UDC: ret=%d udev=%p\n", ret, udc);
 	if (ret) {
-		pr_err("USB init failed: %d\n", ret);
+		pr_err("USB init failed: %d (no USB gadget UDC)\n", ret);
 		return CMD_RET_FAILURE;
 	}
 
 	g_dnl_clear_detach();
+	printf("FB-DNL: registering...\n");
 	ret = g_dnl_register("usb_dnl_fastboot");
+	printf("FB-DNL: ret=%d\n", ret);
 	if (ret)
 		return ret;
 

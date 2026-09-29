@@ -23,5 +23,6 @@ struct musb_host_data {
 extern struct dm_usb_ops musb_usb_ops;
 
 int musb_lowlevel_init(struct musb_host_data *host);
+int musb_gadget_handle_interrupts(struct udevice *dev);
 
 #endif

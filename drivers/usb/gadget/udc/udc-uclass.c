@@ -37,12 +37,14 @@ int udc_device_get_by_index(int index, struct udevice **udev)
 	int ret;
 
 	ret = uclass_get_device_by_seq(UCLASS_USB_GADGET_GENERIC, index, &dev);
+	printf("UDC-GET: by_seq(%d) ret=%d\n", index, ret);
 	if (!ret && dev) {
 		*udev = dev;
 		return 0;
 	}
 
 	ret = uclass_get_device(UCLASS_USB_GADGET_GENERIC, index, &dev);
+	printf("UDC-GET: uclass(%d) ret=%d dev=%p\n", index, ret, dev);
 	if (!ret && dev) {
 		*udev = dev;
 		return 0;

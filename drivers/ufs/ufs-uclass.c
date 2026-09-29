@@ -579,7 +579,7 @@ static inline void ufshcd_hba_stop(struct ufs_hba *hba)
 static inline bool ufshcd_is_hba_active(struct ufs_hba *hba)
 {
 	return (ufshcd_readl(hba, REG_CONTROLLER_ENABLE) & CONTROLLER_ENABLE)
-		? false : true;
+		? true : false;
 }
 
 /**
@@ -598,7 +598,7 @@ static int ufshcd_hba_enable(struct ufs_hba *hba)
 	int retry;
 	int ret;
 
-	if (!ufshcd_is_hba_active(hba))
+	if (ufshcd_is_hba_active(hba))
 		/* change controller state to "reset state" */
 		ufshcd_hba_stop(hba);
 
@@ -625,12 +625,13 @@ static int ufshcd_hba_enable(struct ufs_hba *hba)
 	mdelay(1);
 
 	/* wait for the host controller to complete initialization */
-	retry = 10;
-	while (ufshcd_is_hba_active(hba)) {
+	retry = 200;
+	while (!ufshcd_is_hba_active(hba)) {
 		if (retry) {
 			retry--;
 		} else {
-			dev_err(hba->dev, "Controller enable failed\n");
+			dev_err(hba->dev, "Controller enable failed (val=0x%x)\n",
+				ufshcd_readl(hba, REG_CONTROLLER_ENABLE));
 			return -EIO;
 		}
 		mdelay(5);

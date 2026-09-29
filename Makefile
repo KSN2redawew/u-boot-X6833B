@@ -3,11 +3,7 @@
 VERSION = 2026
 PATCHLEVEL = 07
 SUBLEVEL =
-<<<<<<< HEAD
 EXTRAVERSION = -rc5
-=======
-EXTRAVERSION =
->>>>>>> denx/master
 NAME =
 
 # *DOCUMENTATION*

@@ -355,6 +355,12 @@ found:
 }
 EXPORT_SYMBOL_GPL(usb_gadget_probe_driver);
 
+/*
+ * usb_gadget_register_driver() / usb_gadget_unregister_driver() are provided
+ * by drivers/usb/musb-new/musb_uboot.c (MUSB gadget path).  Keep the
+ * udc-list based versions out of the build to avoid duplicate symbols.
+ */
+#if 0
 int usb_gadget_register_driver(struct usb_gadget_driver *driver)
 {
 	return usb_gadget_probe_driver(driver);
@@ -383,6 +389,7 @@ int usb_gadget_unregister_driver(struct usb_gadget_driver *driver)
 	return ret;
 }
 EXPORT_SYMBOL_GPL(usb_gadget_unregister_driver);
+#endif
 
 MODULE_DESCRIPTION("UDC Framework");
 MODULE_AUTHOR("Felipe Balbi <balbi@ti.com>");

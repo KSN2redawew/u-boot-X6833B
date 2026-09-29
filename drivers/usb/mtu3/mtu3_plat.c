@@ -35,11 +35,60 @@ void ssusb_set_force_mode(struct ssusb_mtk *ssusb,
 }
 
 /* u2-port0 should be powered on and enabled; */
+static void ssusb_dbg_dump(struct ssusb_mtk *ssusb, const char *tag,
+			    phys_addr_t base, int nw)
+{
+	int i, j;
+
+	for (i = 0; i < nw; i += 4) {
+		u32 v[4];
+
+		for (j = 0; j < 4; j++)
+			v[j] = readl((void __iomem *)(uintptr_t)(base + (i + j) * 4));
+		dev_info(ssusb->dev, "%s %08lx: %08x %08x %08x %08x\n",
+			 tag, (unsigned long)(base + i * 4),
+			 v[0], v[1], v[2], v[3]);
+	}
+}
+
 int ssusb_check_clocks(struct ssusb_mtk *ssusb, u32 ex_clks)
 {
 	void __iomem *ibase = ssusb->ippc_base;
+	void __iomem *apm = (void __iomem *)0x1000C000;
 	u32 value, check_val;
 	int ret;
+
+	/* USBPLL (apmixed) diagnostics + force-on (G99 usb0 clks:
+	 * IFRAO_SSUSB + TOP_USB_TOP_SEL + APMIXED_USBPLL) */
+	{
+		u32 c0 = readl(apm + 0x3C4);
+		u32 c2 = readl(apm + 0x3C8);
+		dev_info(ssusb->dev,
+			 "USBPLL: con0=%08x con1=%08x con2=%08x\n",
+			 c0, readl(apm + 0x3C8), readl(apm + 0x3CC));
+		if (c0 & BIT(24)) {
+			dev_info(ssusb->dev, "USBPLL: pd set, powering on\n");
+			writel(c0 & ~BIT(24), apm + 0x3C4);
+			c0 = readl(apm + 0x3C4);
+		}
+		if (!(c2 & BIT(0)) || !(c2 & BIT(23))) {
+			writel(c2 | BIT(0) | BIT(23), apm + 0x3C8);
+			udelay(100);
+		}
+		dev_info(ssusb->dev,
+			 "USBPLL after: con0=%08x con2=%08x\n",
+			 readl(apm + 0x3C4), readl(apm + 0x3C8));
+	}
+
+	/* ---- v9 full-region dump ---- */
+	ssusb_dbg_dump(ssusb, "MAC0", 0x11200000, 0x10);
+	ssusb_dbg_dump(ssusb, "IPPC", 0x11210000, 0x10);
+	ssusb_dbg_dump(ssusb, "APM", 0x1000C000 + 0x3C0, 0x10);
+	ssusb_dbg_dump(ssusb, "TOP", 0x10000000, 0x40);
+	ssusb_dbg_dump(ssusb, "INFRA", 0x10001000 + 0xA0, 0x8);
+	ssusb_dbg_dump(ssusb, "SPM", 0x10006000, 0x10);
+	ssusb_dbg_dump(ssusb, "PERI", 0x10003000, 0x10);
+
 
 	check_val = ex_clks | SSUSB_SYS125_RST_B_STS | SSUSB_SYSPLL_STABLE |
 			SSUSB_REF_RST_B_STS;
@@ -48,6 +97,28 @@ int ssusb_check_clocks(struct ssusb_mtk *ssusb, u32 ex_clks)
 				 ((value & check_val) == check_val), 10000);
 	if (ret) {
 		dev_err(ssusb->dev, "clks of sts1 are not stable!\n");
+		dev_err(ssusb->dev,
+			"USTS1: ctrl0=%08x ctrl1=%08x ctrl2=%08x ctrl3=%08x sts1=%08x sts2=%08x refck=%08x\n",
+			readl(ibase + U3D_SSUSB_IP_PW_CTRL0),
+			readl(ibase + U3D_SSUSB_IP_PW_CTRL1),
+			readl(ibase + U3D_SSUSB_IP_PW_CTRL2),
+			readl(ibase + U3D_SSUSB_IP_PW_CTRL3),
+			readl(ibase + U3D_SSUSB_IP_PW_STS1),
+			readl(ibase + U3D_SSUSB_IP_PW_STS2),
+			readl(ibase + U3D_SSUSB_REF_CK_CTRL));
+		dev_err(ssusb->dev,
+			"CLKMUX: topCFG9=%08x topUPD1=%08x ifraA4=%08x ifraA8=%08x\n",
+			readl((void __iomem *)0x10000000 + 0x90),
+			readl((void __iomem *)0x10000000 + 0x08),
+			readl((void __iomem *)0x10001000 + 0xA4),
+			readl((void __iomem *)0x10001000 + 0xA8));
+		writel(0x5A5A5A5A, ibase + U3D_SSUSB_IP_SPARE0);
+		dev_err(ssusb->dev,
+			"PROBE: hwid=%08x spare0_rd=%08x mac0=%08x mac54=%08x\n",
+			readl(ibase + U3D_SSUSB_HW_ID),
+			readl(ibase + U3D_SSUSB_IP_SPARE0),
+			readl(ssusb->mac_base + 0x0000),
+			readl(ssusb->mac_base + 0x0054));
 		return ret;
 	}
 
@@ -150,8 +221,8 @@ static int get_ssusb_rscs(struct udevice *dev, struct ssusb_mtk *ssusb)
 
 	ret = clk_get_bulk(dev, &ssusb->clks);
 	if (ret) {
-		dev_err(dev, "failed to get clocks %d!\n", ret);
-		return ret;
+		dev_warn(dev, "failed to get clocks %d; assuming preloader kept SSUSB clocked\n", ret);
+		ssusb->clks.count = 0;
 	}
 
 	ssusb->ippc_base = devfdt_remap_addr_name(dev, "ippc");
@@ -199,6 +270,7 @@ static int mtu3_probe(struct udevice *dev)
 	ret = get_ssusb_rscs(dev, ssusb);
 	if (ret)
 		return ret;
+	dev_info(dev, "MTU3-PROBE ok: ippc=%p mac=%p dr=%d\n", ssusb->ippc_base, ssusb->mac_base, ssusb->dr_mode);
 
 	ret = ssusb_rscs_init(ssusb);
 	if (ret)
@@ -228,9 +300,17 @@ static int mtu3_gadget_probe(struct udevice *dev)
 	struct ssusb_mtk *ssusb = dev_to_ssusb(dev->parent);
 	struct mtu3 *mtu = dev_get_priv(dev);
 
+	dev_err(dev, "MTU3-GADGET probe: enter\n");
+	extern int mtu3_gadget_status;
+	mtu3_gadget_status = 3;
 	mtu->dev = dev;
 	ssusb->u3d = mtu;
-	return ssusb_gadget_init(ssusb);
+	{
+		int __gr = ssusb_gadget_init(ssusb);
+		mtu3_gadget_status = __gr ? __gr : 4;
+		dev_err(dev, "MTU3-GADGET probe -> %d\n", __gr);
+		return __gr;
+	}
 }
 
 static int mtu3_gadget_remove(struct udevice *dev)
@@ -308,6 +388,9 @@ U_BOOT_DRIVER(mtu3_host) = {
 };
 #endif
 
+int mtu3_glue_bind_status = -999;
+int mtu3_gadget_status = -999;
+
 static int mtu3_glue_bind(struct udevice *parent)
 {
 	struct udevice *dev;
@@ -315,11 +398,16 @@ static int mtu3_glue_bind(struct udevice *parent)
 	const char *driver;
 	const char *name;
 	ofnode node;
+	dev_err(parent, "MTU3-GLUE bind: enter\n");
+	mtu3_glue_bind_status = 0;
 	int ret;
 
 	node = ofnode_by_compatible(dev_ofnode(parent), "mediatek,ssusb");
 	if (!ofnode_valid(node))
 		return -ENODEV;
+	mtu3_glue_bind_status = 1;
+	dev_err(parent, "MTU3-GLUE: ssusb child FOUND\n");
+	dev_err(parent, "MTU3-GLUE: ssusb child found\n");
 
 	name = ofnode_get_name(node);
 	dr_mode = usb_get_dr_mode(node);
@@ -350,6 +438,8 @@ static int mtu3_glue_bind(struct udevice *parent)
 		__func__, name, driver, dr_mode);
 
 	ret = device_bind_driver_to_node(parent, driver, name, node, &dev);
+	mtu3_glue_bind_status = ret ? ret : 2;
+	dev_err(parent, "MTU3-GLUE: bind_driver -> %d\n", ret);
 	if (ret)
 		dev_err(parent, "%s: not able to bind usb device mode\n",
 			__func__);

@@ -220,11 +220,8 @@ config SYS_BOARD
 	  be used.
 
 config SYS_CONFIG_NAME
-<<<<<<< HEAD
 	default "mt6878" if TARGET_MT6878
 	default "mt7622" if TARGET_MT7622
-=======
->>>>>>> denx/master
 	default "mt7623" if TARGET_MT7623
 	default "mt7629" if TARGET_MT7629
 	default "mt7981" if TARGET_MT7981

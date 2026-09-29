@@ -391,13 +391,13 @@
 			interrupts = <GIC_SPI 137 IRQ_TYPE_LEVEL_HIGH 0>;
 
 			/*
-			clocks = <&infracfg_ao_clk CLK_IFRAO_UFS>,
-				<&infracfg_ao_clk CLK_IFRAO_UFS_SAP_BCLK>,
-				<&infracfg_ao_clk CLK_IFRAO_UNIPRO_TICK>,
-				<&infracfg_ao_clk CLK_IFRAO_UNIPRO_SYSCLK>,
-				<&infracfg_ao_clk CLK_IFRAO_UFS_AES>,
-				<&topckgen_clk CLK_TOP_AES_UFSFDE_SEL>,
-				<&topckgen_clk CLK_TOP_UFS_SEL>;
+			clocks = <&infracfg_ao CLK_IFRAO_UFS>,
+				<&infracfg_ao CLK_IFRAO_UFS_SAP_BCLK>,
+				<&infracfg_ao CLK_IFRAO_UNIPRO_TICK>,
+				<&infracfg_ao CLK_IFRAO_UNIPRO_SYSCLK>,
+				<&infracfg_ao CLK_IFRAO_UFS_AES>,
+				<&topckgen CLK_TOP_AES_UFSFDE_SEL>,
+				<&topckgen CLK_TOP_UFS_SEL>;
 			*/
 			clock-names =
 				"ufs",

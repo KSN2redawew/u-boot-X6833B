@@ -6,6 +6,7 @@
 #include "mt6789.dtsi"
 #include <dt-bindings/gpio/gpio.h>
 #include <dt-bindings/input/input.h>
+#include <dt-bindings/clock/mediatek,mt6789-clk.h>
 
 / {
 	model = "Infinix NOTE 30";
@@ -17,6 +18,7 @@
 
 	aliases {
 		serial0 = &uart0;
+		usb_gadget0 = &usb;
 	};
 
 	chosen {
@@ -272,10 +274,14 @@
 };
 
 &usb {
-	status = "okay";
-
+	compatible = "mediatek,mt8518-musb", "mediatek,mtk-musb";
+	clocks = <&infracfg_ao CLK_IFRAO_SSUSB>,
+		 <&topckgen CLK_TOP_USB_TOP_SEL>,
+		 <&clk26m>;
+	clock-names = "usb", "usbmcu", "usbpll";
 	dr_mode = "peripheral";
 	maximum-speed = "high-speed";
+	status = "okay";
 };
 
 &u2phy {

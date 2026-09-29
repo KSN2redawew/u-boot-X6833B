@@ -264,15 +264,12 @@ static void boot_jump_linux(struct bootm_headers *images, int flag)
 {
 	void (*kernel_entry)(void *fdt_addr, void *res0, void *res1,
 			void *res2);
-<<<<<<< HEAD
 	int fake = (flag & BOOTM_STATE_OS_FAKE_GO);
 
 #ifdef CONFIG_MTK_SMC_JUMP
 	struct arm_smccc_res smccc_res = {0};
 #endif
 
-=======
->>>>>>> denx/master
 	kernel_entry = (void (*)(void *fdt_addr, void *res0, void *res1,
 				void *res2))images->ep;
 
